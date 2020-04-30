@@ -1,6 +1,7 @@
 import os
 import sys
 sys.path.append('/home/hollowed/repos/mpwl-raytrace/NFW_test_cases')
+sys.path.append('/Users/joe/repos/mpwl-raytrace/NFW_test_cases')
 from make_simple_halo import simple_halo
 from raytrace_simple_halo import raytracer
 
@@ -68,8 +69,8 @@ def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606):
     print('raytracing from zs = {}'.format(zs))
     rt = raytracer(halo_dir, lensing_dir, zs, seed=seed)
     rt.halo_raytrace() 
-    #print('drawing lensing maps'.format(zs))
-    #rt.vis_outputs()
+    print('drawing lensing maps'.format(zs))
+    rt.vis_outputs()
 
 
 if __name__ == '__main__':
