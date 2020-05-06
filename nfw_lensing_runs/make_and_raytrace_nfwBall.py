@@ -1,7 +1,7 @@
 import os
 import sys
-sys.path.append('/home/hollowed/repos/mpwl-raytrace/NFW_test_cases')
-sys.path.append('/Users/joe/repos/mpwl-raytrace/NFW_test_cases')
+sys.path.append('/home/hollowed/repos/mpwl-raytrace/NFW_test_cases') # cooley
+sys.path.append('/Users/joe/repos/mpwl-raytrace/NFW_test_cases') # miniroomba
 from make_simple_halo import NFW
 from raytrace_simple_halo import raytracer
 
@@ -9,7 +9,7 @@ from raytrace_simple_halo import raytracer
 # ===============================================================================
 
 
-def make_halo(z=0.3, N=10000, rfrac=6, vis=True, out_dir=None, seed=606):
+def make_halo(z=0.3, N=10000, rfrac=6, vis=False, out_dir=None, seed=606):
     '''
     Generate an NFW particle distribution and place it at a redshift z via the mathods in mpwl_raytrace
 
@@ -32,13 +32,13 @@ def make_halo(z=0.3, N=10000, rfrac=6, vis=True, out_dir=None, seed=606):
             results
     '''
     if(out_dir is None):
-        out_dir=os.path.abspath("./realizations/halo_z{:.2f}_N{}_{:.2f}r200c".format(z, N, rfrac))
+        out_dir=os.path.abspath("./output/halo_z{:.2f}_N{}_{:.2f}r200c".format(z, N, rfrac))
     
     print('Populating halo with particles')
-    #halo = NFW(m200c = 1e14, z=z, seed=seed)
-    #halo.populate_halo(N=N, rfrac=rfrac)
-    #print('writing out')
-    #halo.output_particles(output_dir = out_dir, vis_debug=vis)
+    halo = NFW(m200c = 1e14, z=z, seed=seed)
+    halo.populate_halo(N=N, rfrac=rfrac)
+    print('writing out')
+    halo.output_particles(output_dir = out_dir, vis_debug=vis)
     
     raytrace_halo(out_dir)
 
@@ -70,10 +70,10 @@ def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606):
     rt = raytracer(halo_dir, lensing_dir, zs, seed=seed)
     rt.halo_raytrace() 
     print('drawing lensing maps'.format(zs))
-    rt.vis_outputs()
+    #rt.vis_outputs()
 
 
 if __name__ == '__main__':
-    for zl in [0.2, 0.3, 0.4]:
+    for zl in [0.3]:
         make_halo(z=zl)
 
