@@ -9,20 +9,22 @@ from raytrace_simple_halo import raytracer
 # ===============================================================================
 
 
-def make_halo(z=0.3, N=10000, rfrac=6, vis=False, out_dir=None, seed=606):
+def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, vis=False, out_dir=None, seed=606):
     '''
     Generate an NFW particle distribution and place it at a redshift z via the mathods in mpwl_raytrace
 
     Parameters
     ----------
-    z : float, optional
-        redshift of halo; defaults to 0.2
+    zl : float, optional
+        redshift of lens; defaults to 0.2
+    zs : float, optional
+        redshift of sources; defaults to 1.0
     N : int, optional
         number of particles to draw; defaults to 10000
     rfarc : float, optional
         physical extent of generated particle set in units of r200c; defaults to 6
     vis : bool, optional
-        flag to send to make_simple_halo to generate shear/deflection figures or not (takes long)
+        flag to send to make_simple_halo to generate a figure of the NFW particles or not
     out_dir : str, optinal
         location for output, does not have to exist; defaults to 
         ./realizations/halo_z{:.2f}_N{}_{:.2f}r200c".foramt(z, N, rfrac)
@@ -32,21 +34,21 @@ def make_halo(z=0.3, N=10000, rfrac=6, vis=False, out_dir=None, seed=606):
             results
     '''
     if(out_dir is None):
-        out_dir=os.path.abspath("./output/halo_z{:.2f}_N{}_{:.2f}r200c".format(z, N, rfrac))
+        out_dir=os.path.abspath("./output/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c".format(zl, zs, N, rfrac))
     
     print('Populating halo with particles')
-    halo = NFW(m200c = 1e14, z=z, seed=seed)
+    halo = NFW(m200c = 1e14, z=zl, seed=seed)
     halo.populate_halo(N=N, rfrac=rfrac)
     print('writing out')
     halo.output_particles(output_dir = out_dir, vis_debug=vis)
     
-    raytrace_halo(out_dir)
+    raytrace_halo(out_dir, zs=[zs], vis=vis)
 
 
 # ===============================================================================
 
 
-def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606):
+def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606, vis=False):
     '''
     Compute lensing maps for an NFW particle distribution for a single lens plane and a source population zs
 
@@ -62,17 +64,27 @@ def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606):
     seed : float, optional
         Random seed to pass to make_lensing_mocks for placement of interpolation points on lensing
         maps. None gives stochastic results.
+    vis : bool, optional
+        flag to send to the raytracing modules to generate shear/deflection figures or not (takes long)
     '''
     if(lensing_dir is None):
         lensing_dir="{}/lensing_maps_zs_{}".format(halo_dir, '_'.join(map(str, zs)))
     
     print('raytracing from zs = {}'.format(zs))
     rt = raytracer(halo_dir, lensing_dir, zs, seed=seed)
-    rt.halo_raytrace() 
-    print('drawing lensing maps'.format(zs))
-    #rt.vis_outputs()
+    rt.halo_raytrace()
+    if(vis):
+        print('drawing lensing maps'.format(zs))
+        rt.vis_outputs()
 
 
 if __name__ == '__main__':
-    make_halo(z=float(sys.argv[1]))
+
+    zl, zs, N, rfrac = 0.2, 1.0, 10000, 6
+    if(len(sys.argv)==2): zl = float(sys.argv[1])
+    if(len(sys.argv)==3): zs = float(sys.argv[2])
+    if(len(sys.argv)==4): N = int(sys.argv[3])
+    if(len(sys.argv)==5): rfrac = float(sys.argv[4])
+
+    make_halo(zl, zs, N, rfrac, vis=False)
 
