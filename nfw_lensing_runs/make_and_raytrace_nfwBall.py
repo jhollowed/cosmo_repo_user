@@ -74,6 +74,5 @@ def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606):
 
 
 if __name__ == '__main__':
-    for zl in [0.3]:
-        make_halo(z=zl)
+        make_halo(z=sys.argv[1])
 

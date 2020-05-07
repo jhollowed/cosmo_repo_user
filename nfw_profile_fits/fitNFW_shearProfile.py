@@ -329,5 +329,5 @@ def imscatter(x, y, image, ax=None, zoom=1):
     ax.autoscale()
     return artists
 
-if(__name__ == "__main__"): 
-    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/realizations/halo_z0.20_N10000_6.00r200c/lensing_maps_zs_1.0', bin_data=False, rmin=0.2)
+if(__name__ == "__main__"):
+    nfw_test(halo_cutout_dir = '/Users/joe/Desktop/halo_z0.30_N10000_6.00r200c/lensing_maps_zs_1.0', bin_data=False, rmin=0.2)

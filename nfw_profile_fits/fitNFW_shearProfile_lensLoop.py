@@ -21,8 +21,7 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from astropy.cosmology import FlatLambdaCDM
 cosmo = FlatLambdaCDM(H0=71, Om0=0.220, Ob0=0.02258*(0.71**2), name='OuterRim')
 
-def nfw_test(halo_cutout_dir='/Users/joe/repos/repo_user/nfw_lensing_runs/realizations', 
-             makeplot = True, showfig=True, stdout=True, bin_data=True, rbins=25, rmin=0, nfw=False):
+def nfw_test(halo_cutout_dir, makeplot = True, showfig=True, stdout=True, bin_data=True, rbins=25, rmin=0):
     """
     This function performs an example run of the package, fitting an NFW profile to background 
     source data as obtained from ray-tracing through Outer Rim lightcone halo cutouts. The process 
@@ -80,13 +79,12 @@ def nfw_test(halo_cutout_dir='/Users/joe/repos/repo_user/nfw_lensing_runs/realiz
         if not os.path.exists(out_dir): os.makedirs(out_dir)
         fit_nfw(sim_lens, true_profile, showfig=showfig, 
                 out_dir=out_dir, makeplot = makeplot, bin_data=bin_data, 
-                rbins=rbins, rmin=rmin, nfw=nfw)
+                rbins=rbins, rmin=rmin)
 
 
 def read_nfw(halo_cutout_dir):
 
     # get ray-trace hdf5 and properties csv
-    pdb.set_trace()
     rtfs = glob.glob('{}/lensing_maps_zs_1.0/*mock*.hdf5'.format(halo_cutout_dir))
     #rtfs = glob.glob('{}/*grid*.hdf5'.format(halo_cutout_dir))
     
@@ -151,7 +149,7 @@ def read_nfw(halo_cutout_dir):
 
     
 def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.', 
-            bin_data=True, rbins=25, rmin = 0, nfw=False, savedata=False):
+            bin_data=True, rbins=25, rmin = 0, savedata=False):
 
     zl = lens.zl
     r200c = true_profile.r200c
@@ -249,12 +247,8 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
         ax.loglog(r/r200c, fit_var, 'xk', 
                 label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$', alpha=0.33)
     else:
-        if(nfw):
-            img = '/Users/joe/Desktop/images.jpeg'
-            imscatter((binned_r[0]/r200c)[::-1], (binned_dsig[0])[::-1], img, zoom=0.3, ax=ax)
-        else:
-            ax.plot(binned_r[0]/r200c, binned_dsig[0], '-xk', 
-                    label=r'$\gamma_{\mathrm{NFW}} \Sigma_c$')
+        ax.plot(binned_r[0]/r200c, binned_dsig[0], '-xk', 
+                label=r'$\gamma_{\mathrm{NFW}} \Sigma_c$')
     
     ax.plot(rR, dSigma_true, '--', label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
                                             .format(r200c, c), color=color[0], lw=2)
@@ -312,9 +306,7 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
     plt.tight_layout()
     if(showfig): plt.show()
     
-    if(bin_data and nfw):
-        f.savefig('{}/{}_shearprof_fit_{}bins_{}rmin_nfw_zl{}.png'.format(out_dir, zl, rbins, rmin, zl), dpi=300)
-    if(bin_data and not nfw):
+    if(bin_data):
         f.savefig('{}/{}_shearprof_fit_{}bins_{}rmin_zl{}.png'.format(out_dir, zl, rbins, rmin, zl), dpi=300)
     else:
         f.savefig('{}/{}_shearprof_fit_{}rmin_zl{}.png'.format(out_dir, zl, rmin, zl), dpi=300)
@@ -340,5 +332,4 @@ def imscatter(x, y, image, ax=None, zoom=1):
 
 
 if(__name__ == "__main__"): 
-    #nfw_test(bin_data=True, nfw=True)
-    nfw_test(bin_data=False, rmin=0.2, showfig=False)
+    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output', bin_data=False, rmin=0.2, showfig=False)
