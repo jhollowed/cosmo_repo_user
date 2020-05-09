@@ -9,7 +9,7 @@ from raytrace_simple_halo import raytracer
 # ===============================================================================
 
 
-def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, vis=False, out_dir=None, seed=606):
+def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, vis=False, out_dir='./output', seed=606):
     '''
     Generate an NFW particle distribution and place it at a redshift z via the mathods in mpwl_raytrace
 
@@ -26,15 +26,14 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, vis=False, out_dir=None, seed=60
     vis : bool, optional
         flag to send to make_simple_halo to generate a figure of the NFW particles or not
     out_dir : str, optinal
-        location for output, does not have to exist; defaults to 
-        ./realizations/halo_z{:.2f}_N{}_{:.2f}r200c".foramt(z, N, rfrac)
+        location for output, does not have to exist; defaults to "./output/" where "." is the current working directory.
+        within this location, a directory will be created as "halo_z{:.2f}_N{}_{:.2f}r200c".foramt(z, N, rfrac)
     seed : float, optional
             Random seed to pass to HaloTools for generation of radial particle positions, and
             use for drawing concentrations and angular positions of particles. None for stocahstic
             results
     '''
-    if(out_dir is None):
-        out_dir=os.path.abspath("./output/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c".format(zl, zs, N, rfrac))
+    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c".format(out_dir, zl, zs, N, rfrac))
     
     print('Populating halo with particles')
     halo = NFW(m200c = 1e14, z=zl, seed=seed)
@@ -80,11 +79,12 @@ def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606, vis=False):
 
 if __name__ == '__main__':
 
-    zl, zs, N, rfrac = 0.2, 1.0, 10000, 6
+    zl, zs, N, rfrac, out_dir, vis = 0.2, 1.0, 10000, 6, './output', False
     if(len(sys.argv)==2): zl = float(sys.argv[1])
     if(len(sys.argv)==3): zs = float(sys.argv[2])
     if(len(sys.argv)==4): N = int(sys.argv[3])
     if(len(sys.argv)==5): rfrac = float(sys.argv[4])
+    if(len(sys.argv)==6): out_dir = sys.argv[5]
+    if(len(sys.argv)==7): vis = bool(sys.argv[6])
 
-    make_halo(zl, zs, N, rfrac, vis=False)
-
+    make_halo(zl, zs, N, rfrac, out_dir=out_dir, vis=vis)
