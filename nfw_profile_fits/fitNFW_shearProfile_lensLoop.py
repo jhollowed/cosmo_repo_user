@@ -66,8 +66,8 @@ def nfw_test(halo_cutout_dir, makeplot = True, showfig=True, stdout=True, bin_da
     else: pprint = lambda s: None
 
     pprint('Finding lenses')
-    zlpl_dirs = np.array(glob.glob('{}/halo*'.format(halo_cutout_dir)))
-    zlpl = np.array([float(d.split('z')[-1].split('_')[0]) for d in zlpl_dirs])
+    zlpl_dirs = np.array(glob.glob('{}/halo*zl0.70*'.format(halo_cutout_dir)))
+    zlpl = np.array([float(d.split('zl')[-1].split('_')[0]) for d in zlpl_dirs])
     sort = np.argsort(zlpl)
     zlpl = zlpl[sort]
     zlpl_dirs = zlpl_dirs[sort]
@@ -85,7 +85,7 @@ def nfw_test(halo_cutout_dir, makeplot = True, showfig=True, stdout=True, bin_da
 def read_nfw(halo_cutout_dir):
 
     # get ray-trace hdf5 and properties csv
-    rtfs = glob.glob('{}/lensing_maps_zs_1.0/*mock*.hdf5'.format(halo_cutout_dir))
+    rtfs = glob.glob('{}/lensing_maps_zs*/*mock*.hdf5'.format(halo_cutout_dir))
     #rtfs = glob.glob('{}/*grid*.hdf5'.format(halo_cutout_dir))
     
     pfs = glob.glob('{}/properties.csv'.format(halo_cutout_dir))
@@ -302,14 +302,18 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
     cbar.set_label(r'$\mathrm{min}(\chi^2)/\chi^2$', fontsize=14)
     ax2.set_xlabel(r'$R_{200c}\>\>\left[\mathrm{Mpc/h}\right]$', fontsize=14)
     ax2.set_ylabel(r'$c_{200c}$', fontsize=14)
+    ax.set_xlim([0.2, 6])
+    ax.set_ylim([2, 300])
 
     plt.tight_layout()
     if(showfig): plt.show()
     
-    if(bin_data):
-        f.savefig('{}/{}_shearprof_fit_{}bins_{}rmin_zl{}.png'.format(out_dir, zl, rbins, rmin, zl), dpi=300)
-    else:
-        f.savefig('{}/{}_shearprof_fit_{}rmin_zl{}.png'.format(out_dir, zl, rmin, zl), dpi=300)
+    if(len(np.unique(zs))> 1): zsstr = 'zs{}-{}'.format(np.min(zs), np.max(zs))
+    else: zsstr = 'zs{}'.format(zs[0])
+    if(bin_data): binstr = '_{}bins_'.format(rbins)
+    else: binstr = '_'
+    f.savefig('{}/shearprof_fit{}{}rmin_zl{}_{}.png'.format(
+               out_dir, binstr, rmin, zl, zsstr), dpi=300)
 
 
 def imscatter(x, y, image, ax=None, zoom=1):
