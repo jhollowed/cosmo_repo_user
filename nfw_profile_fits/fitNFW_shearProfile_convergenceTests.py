@@ -238,10 +238,16 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
     if(savedata):
         np.save('{}/m200c_fit_{}.npy'.format(out_dir, sfx), 
                 fitted_profile.radius_to_mass())
+        np.save('{}/r200c_fit_{}.npy'.format(out_dir, sfx), 
+                fitted_profile.r200c)
         np.save('{}/m200c_cM_fit_{}.npy'.format(out_dir, sfx), 
                 fitted_cm_profile.radius_to_mass())
+        np.save('{}/r200c_cM_fit_{}.npy'.format(out_dir, sfx), 
+                fitted_cm_profile.r200c)
         np.save('{}/m200c_true_{}.npy'.format(out_dir, sfx), 
                 m200c)
+        np.save('{}/r200c_true_{}.npy'.format(out_dir, sfx), 
+                r200c)
 
     if(not makeplot): return
 
@@ -334,7 +340,7 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
                out_dir, binstr, rmin, sfx), dpi=300)
 
 
-def plot_convergence_results(out_dir, vary_var):
+def plot_convergence_results_mass(out_dir, vary_var):
     
         fit_out = glob.glob('{}/m200c_fit*.npy'.format(out_dir))
         m = np.array([np.load(f) for f in fit_out])
@@ -359,9 +365,39 @@ def plot_convergence_results(out_dir, vary_var):
         ax.plot(vary_val_m[sm], m[sm]/m_true[sm], '-dr', label="unconstrained fit")
         ax.plot(vary_val_cm[scm], m_cm[scm]/m_true[scm], '-db', label="c-M relation fit")
         ax.set_xlabel(vary_var, fontsize=14)
-        ax.set_ylabel('m200c_fit / m20c_truth', fontsize=14)
+        ax.set_ylabel(r'$m_{200c,\mathrm{fit}} / m_{200c,\mathrm{truth}}$', fontsize=14)
         ax.legend()
-        plt.savefig('{}_convergence2.png'.format(vary_var), dpi=300)
+        plt.savefig('{}_convergence_mass2.png'.format(vary_var), dpi=300)
+
+
+def plot_convergence_results_radius(out_dir, vary_var):
+    
+        fit_out = glob.glob('{}/r200c_fit*.npy'.format(out_dir))
+        r = np.array([np.load(f) for f in fit_out])
+        cmfit_out = glob.glob('{}/r200c_cM*.npy'.format(out_dir))
+        r_cm = np.array([np.load(f) for f in cmfit_out])
+        truth_out = glob.glob('{}/r200c_true*.npy'.format(out_dir))
+        r_true = np.array([np.load(f) for f in truth_out])
+        
+        vary_val_r = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.npy')) 
+                               for f in fit_out])
+        vary_val_cm = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.npy')) 
+                                for f in cmfit_out])
+        vary_val_truth = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.npy')) 
+                                   for f in truth_out])
+        sm = np.argsort(vary_val_m)
+        scm = np.argsort(vary_val_cm)
+        st = np.argsort(vary_val_truth)
+        
+        f = plt.figure()
+        ax = f.add_subplot(111)
+        ax.plot(vary_val_truth[st], r_true[st]/r_true[st], '--k', label="truth")
+        ax.plot(vary_val_m[sm], r[sm]/r_true[sm], '-dr', label="unconstrained fit")
+        ax.plot(vary_val_cm[scm], r_cm[scm]/r_true[scm], '-db', label="c-M relation fit")
+        ax.set_xlabel(vary_var, fontsize=14)
+        ax.set_ylabel(r'$r_{200c,\mathrm{fit}} / r_{200c,\mathrm{truth}}$', fontsize=14)
+        ax.legend()
+        plt.savefig('{}_convergence_rad2.png'.format(vary_var), dpi=300)
         
 
 def imscatter(x, y, image, ax=None, zoom=1):
