@@ -361,7 +361,7 @@ def plot_convergence_results(out_dir, vary_var):
         ax.set_xlabel(vary_var, fontsize=14)
         ax.set_ylabel('m200c_fit / m20c_truth', fontsize=14)
         ax.legend()
-        plt.savefig('{}_convergence.png'.format(vary_var), dpi=300)
+        plt.savefig('{}_convergence2.png'.format(vary_var), dpi=300)
         
 
 def imscatter(x, y, image, ax=None, zoom=1):
@@ -387,11 +387,15 @@ if(__name__ == "__main__"):
     
     dont_skip_fit = False
     
-    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl', 
-             bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
-    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zs', 
-             bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
-    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_N', 
-             bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
-    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rfrac', 
-             bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
+    # run all convergence tests
+    #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl', 
+    #         bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
+    #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zs', 
+    #         bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
+    #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_N', 
+    #         bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
+    #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rfrac', 
+    #         bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
+    
+    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_rfrac', 
+             bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit)
