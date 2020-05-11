@@ -22,7 +22,7 @@ from astropy.cosmology import FlatLambdaCDM
 cosmo = FlatLambdaCDM(H0=71, Om0=0.220, Ob0=0.02258*(0.71**2), name='OuterRim')
 
 def nfw_test(halo_cutout_dir, makeplot = True, showfig=True, stdout=True, bin_data=True, rbins=25, rmin=0, 
-             dont_skip_fit=False):
+             dont_skip_fit=False, bootstrap=True):
     """
     This function performs an example run of the package, fitting an NFW profile to background 
     source data as obtained from ray-tracing through a pure NFW particle realization. The process 
@@ -90,12 +90,13 @@ def nfw_test(halo_cutout_dir, makeplot = True, showfig=True, stdout=True, bin_da
         
         if(len(glob.glob('{}/*{}.npy'.format(out_dir, output_suffix))) == 0 or dont_skip_fit):
             if not os.path.exists(out_dir): os.makedirs(out_dir)
-            fit_nfw(sim_lens, true_profile, showfig=showfig, 
+            fit_nfw(sim_lens, true_profile, showfig=showfig, bootstrap=bootstrap, 
                     out_dir=out_dir, makeplot = makeplot, bin_data=bin_data, 
                     rbins=rbins, rmin=rmin, sfx=output_suffix, savedata=True)
     
     vary_var = halo_cutout_dir.split('vary_')[-1]
-    plot_convergence_results(out_dir, vary_var)
+    plot_convergence_results_mass(out_dir, vary_var)
+    plot_convergence_results_radius(out_dir, vary_var)
 
 
 def read_nfw(halo_cutout_dir):
@@ -145,7 +146,7 @@ def read_nfw(halo_cutout_dir):
         #rho = np.hstack([k, np.ravel(plane['density'][:])])
         # otherwise
         rho = None
-    
+   
     # trim the fov borders by 10% to be safe
     mask = np.logical_and(np.abs(t1)<props['boxRadius_arcsec']*0.9, 
                           np.abs(t2)<props['boxRadius_arcsec']*0.9)
@@ -164,7 +165,7 @@ def read_nfw(halo_cutout_dir):
     return [sim_lens, true_profile]
 
     
-def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.', 
+def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.', bootstrap=True, 
             bin_data=True, rbins=25, rmin = 0, savedata=False, sfx=None):
 
     zl = lens.zl
@@ -211,19 +212,23 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
     pprint('fitting with floating concentration')
     fitted_profile = NFW(0.75, 3.0, zl)
     fit(lens, fitted_profile, rad_bounds = [0.1, 15], conc_bounds = [1, 10], 
-        bootstrap=True, bin_data=bin_data, bins=rbins)
-    [dSigma_fitted, dSigma_fitted_err] = fitted_profile.delta_sigma(rsamp, bootstrap=True)
-    #dSigma_fitted = fitted_profile.delta_sigma(rsamp, bootstrap=False)
-    #dSigma_fitted_err = np.zeros(len(dSigma_fitted))
+        bootstrap=bootstrap, bin_data=bin_data, bins=rbins)
+    if(bootstrap):
+        [dSigma_fitted, dSigma_fitted_err] = fitted_profile.delta_sigma(rsamp, bootstrap=True)
+    else:
+        dSigma_fitted = fitted_profile.delta_sigma(rsamp, bootstrap=False)
+        dSigma_fitted_err = np.zeros(len(dSigma_fitted))
 
     # and now do it again, iteratively using a c-M relation instead of fitting for c
     pprint('fitting with inferred c-M concentration')
     fitted_cm_profile = NFW(0.75, 3.0, zl)
     fit(lens, fitted_cm_profile, rad_bounds = [0.1, 15], cM_relation='child2018', 
-        bootstrap=True, bin_data=bin_data, bins=rbins)
-    [dSigma_fitted_cm, dSigma_fitted_cm_err] = fitted_cm_profile.delta_sigma(rsamp, bootstrap=True)
-    #dSigma_fitted_cm = fitted_profile.delta_sigma(rsamp, bootstrap=False)
-    #dSigma_fitted_cm_err = np.zeros(len(dSigma_fitted_cm))
+        bootstrap=bootstrap, bin_data=bin_data, bins=rbins)
+    if(bootstrap):
+        [dSigma_fitted_cm, dSigma_fitted_cm_err] = fitted_cm_profile.delta_sigma(rsamp, bootstrap=True)
+    else:
+        dSigma_fitted_cm = fitted_cm_profile.delta_sigma(rsamp, bootstrap=False)
+        dSigma_fitted_cm_err = np.zeros(len(dSigma_fitted_cm))
     
     # write out fitting result
     pprint('r200c_fit = {:.4f}; m200c_fit = {:.4e}; c_fit = {:.2f}'.format(fitted_profile.r200c,
@@ -248,6 +253,9 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
                 m200c)
         np.save('{}/r200c_true_{}.npy'.format(out_dir, sfx), 
                 r200c)
+        #print('CHECK VAL: {:.4f}'.format(fitted_profile.r200c/r200c))
+        #print('CHECK VAL/FILE: {:.4f}'.format(np.load('{}/r200c_fit_{}.npy'.format(out_dir, sfx)) / r200c))
+        #print('CHECK FILE: {:.4f}'.format(np.load('{}/r200c_fit_{}.npy'.format(out_dir, sfx)) / np.load('{}/r200c_true_{}.npy'.format(out_dir, sfx))))
 
     if(not makeplot): return
 
@@ -302,6 +310,7 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
     # plot fit cost in the radius-concentration plane
     ax2 = f.add_subplot(122)
     chi2 = ax2.pcolormesh(grid_pos[0], grid_pos[1], (1/grid_res)/(np.max(1/grid_res)), cmap='plasma')
+    ax2.plot([r200c], [c], 'xw', ms=10, mew=1)
     ax2.plot([r200c], [c], 'xk', ms=10, label=r'$\mathrm{{truth}}$')
     ax2.errorbar(fitted_profile.r200c, fitted_profile.c, 
                  xerr=fitted_profile.r200c_err, yerr=fitted_profile.c_err, 
@@ -316,7 +325,7 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
     for i in range(len(tmp_m200c)):
         tmp_profile.r200c = grid_pos[0][0][i]
         tmp_m200c[i] = tmp_profile.radius_to_mass()
-    tmp_c, tmp_dc = cm(tmp_m200c, zl, cosmo)
+    tmp_c, tmp_dc = cm(tmp_m200c * cosmo.h, zl, cosmo)
     ax2.plot(grid_pos[0][0], tmp_c, '--k', lw=2, label=r'$c\mathrm{-}M\mathrm{\>relation\>(Child+2018)}$')
     ax2.fill_between(grid_pos[0][0], tmp_c - tmp_dc, tmp_c + tmp_dc, color='k', alpha=0.1, lw=0)
 
@@ -326,7 +335,7 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.',
     ax2.legend(fontsize=12, loc='upper right')
     cbar = f.colorbar(chi2, ax=ax2)
     cbar.set_label(r'$\mathrm{min}(\chi^2)/\chi^2$', fontsize=14)
-    ax2.set_xlabel(r'$R_{200c}\>\>\left[\mathrm{Mpc/h}\right]$', fontsize=14)
+    ax2.set_xlabel(r'$R_{200c}\>\>\left[\mathrm{Mpc}\right]$', fontsize=14)
     ax2.set_ylabel(r'$c_{200c}$', fontsize=14)
     ax.set_xlim([0.2, 6])
     ax.set_ylim([2, 300])
@@ -358,16 +367,16 @@ def plot_convergence_results_mass(out_dir, vary_var):
         sm = np.argsort(vary_val_m)
         scm = np.argsort(vary_val_cm)
         st = np.argsort(vary_val_truth)
-        
+ 
         f = plt.figure()
         ax = f.add_subplot(111)
         ax.plot(vary_val_truth[st], m_true[st]/m_true[st], '--k', label="truth")
-        ax.plot(vary_val_m[sm], m[sm]/m_true[sm], '-dr', label="unconstrained fit")
-        ax.plot(vary_val_cm[scm], m_cm[scm]/m_true[scm], '-db', label="c-M relation fit")
+        ax.plot(vary_val_m[sm], m[sm]/m_true[st], '-dr', label="unconstrained fit")
+        ax.plot(vary_val_cm[scm], m_cm[scm]/m_true[st], '-db', label="c-M relation fit")
         ax.set_xlabel(vary_var, fontsize=14)
         ax.set_ylabel(r'$m_{200c,\mathrm{fit}} / m_{200c,\mathrm{truth}}$', fontsize=14)
         ax.legend()
-        plt.savefig('{}_convergence_mass2.png'.format(vary_var), dpi=300)
+        plt.savefig('convergence_tests/{}_convergence_mass2.png'.format(vary_var), dpi=300)
 
 
 def plot_convergence_results_radius(out_dir, vary_var):
@@ -385,19 +394,19 @@ def plot_convergence_results_radius(out_dir, vary_var):
                                 for f in cmfit_out])
         vary_val_truth = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.npy')) 
                                    for f in truth_out])
-        sm = np.argsort(vary_val_m)
+        sm = np.argsort(vary_val_r)
         scm = np.argsort(vary_val_cm)
         st = np.argsort(vary_val_truth)
         
         f = plt.figure()
         ax = f.add_subplot(111)
         ax.plot(vary_val_truth[st], r_true[st]/r_true[st], '--k', label="truth")
-        ax.plot(vary_val_m[sm], r[sm]/r_true[sm], '-dr', label="unconstrained fit")
-        ax.plot(vary_val_cm[scm], r_cm[scm]/r_true[scm], '-db', label="c-M relation fit")
+        ax.plot(vary_val_r[sm], r[sm]/r_true[st], '-dr', label="unconstrained fit")
+        ax.plot(vary_val_cm[scm], r_cm[scm]/r_true[st], '-db', label="c-M relation fit")
         ax.set_xlabel(vary_var, fontsize=14)
         ax.set_ylabel(r'$r_{200c,\mathrm{fit}} / r_{200c,\mathrm{truth}}$', fontsize=14)
         ax.legend()
-        plt.savefig('{}_convergence_rad2.png'.format(vary_var), dpi=300)
+        plt.savefig('convergence_tests/{}_convergence_rad2.png'.format(vary_var), dpi=300)
         
 
 def imscatter(x, y, image, ax=None, zoom=1):
@@ -434,4 +443,4 @@ if(__name__ == "__main__"):
     #         bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
     
     nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_zl', 
-             bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit)
+             bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
