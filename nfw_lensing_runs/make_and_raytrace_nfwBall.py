@@ -1,5 +1,6 @@
 import os
 import sys
+import pdb
 sys.path.append('/home/hollowed/repos/mpwl-raytrace/NFW_test_cases') # cooley
 sys.path.append('/Users/joe/repos/mpwl-raytrace/NFW_test_cases') # miniroomba
 from make_simple_halo import NFW
@@ -80,11 +81,11 @@ def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606, vis=False):
 if __name__ == '__main__':
 
     zl, zs, N, rfrac, out_dir, vis = 0.2, 1.0, 10000, 6, './output', False
-    if(len(sys.argv)==2): zl = float(sys.argv[1])
-    if(len(sys.argv)==3): zs = float(sys.argv[2])
-    if(len(sys.argv)==4): N = int(sys.argv[3])
-    if(len(sys.argv)==5): rfrac = float(sys.argv[4])
-    if(len(sys.argv)==6): out_dir = sys.argv[5]
-    if(len(sys.argv)==7): vis = bool(sys.argv[6])
+    if(len(sys.argv) > 1): zl = float(sys.argv[1])
+    if(len(sys.argv) > 2): zs = float(sys.argv[2])
+    if(len(sys.argv) > 3): N = int(sys.argv[3])
+    if(len(sys.argv) > 4): rfrac = float(sys.argv[4])
+    if(len(sys.argv) > 5): out_dir = sys.argv[5]
+    if(len(sys.argv) > 6): vis = bool(sys.argv[6])
 
     make_halo(zl, zs, N, rfrac, out_dir=out_dir, vis=vis)
