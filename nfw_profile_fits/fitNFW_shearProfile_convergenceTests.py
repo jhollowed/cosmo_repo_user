@@ -117,7 +117,6 @@ def read_nfw(halo_cutout_dir):
     c_err = props['sod_halo_cdelta_error']
     m200c = props['sod_halo_mass']
     true_profile = NFW(r200c, c, zl, c_err = c_err, cosmo=cosmo)
-    pdb.set_trace()
     
     raytrace_file = h5py.File(rtfs[0], 'r')
     nplanes = len(list(raytrace_file.keys()))
