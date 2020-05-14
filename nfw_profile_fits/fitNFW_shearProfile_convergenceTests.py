@@ -117,6 +117,7 @@ def read_nfw(halo_cutout_dir):
     c_err = props['sod_halo_cdelta_error']
     m200c = props['sod_halo_mass']
     true_profile = NFW(r200c, c, zl, c_err = c_err, cosmo=cosmo)
+    pdb.set_trace()
     
     raytrace_file = h5py.File(rtfs[0], 'r')
     nplanes = len(list(raytrace_file.keys()))
@@ -325,7 +326,7 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.', boots
     for i in range(len(tmp_m200c)):
         tmp_profile.r200c = grid_pos[0][0][i]
         tmp_m200c[i] = tmp_profile.radius_to_mass()
-    tmp_c, tmp_dc = cm(tmp_m200c * cosmo.h, zl, cosmo)
+    tmp_c, tmp_dc = cm(tmp_m200c, zl, cosmo)
     ax2.plot(grid_pos[0][0], tmp_c, '--k', lw=2, label=r'$c\mathrm{-}M\mathrm{\>relation\>(Child+2018)}$')
     ax2.fill_between(grid_pos[0][0], tmp_c - tmp_dc, tmp_c + tmp_dc, color='k', alpha=0.1, lw=0)
 
@@ -442,5 +443,11 @@ if(__name__ == "__main__"):
     #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rfrac', 
     #         bin_data=False, rmin=0.2, makeplot=False, dont_skip_fit=dont_skip_fit)
     
-    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_zl', 
+    #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_zl', 
+    #         bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
+    #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_zs', 
+    #         bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
+    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_rfrac', 
              bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
+    #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_N', 
+    #         bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
