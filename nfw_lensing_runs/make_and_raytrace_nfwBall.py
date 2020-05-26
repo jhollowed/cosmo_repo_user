@@ -27,8 +27,9 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, vis=False, out_dir='./output', s
     vis : bool, optional
         flag to send to make_simple_halo to generate a figure of the NFW particles or not
     out_dir : str, optinal
-        location for output, does not have to exist; defaults to "./output/" where "." is the current working directory.
-        within this location, a directory will be created as "halo_z{:.2f}_N{}_{:.2f}r200c".foramt(z, N, rfrac)
+        location for output, does not have to exist; defaults to "./output/" where "." is the current
+        working directory. Within this location, a directory will be created as 
+        "halo_z{:.2f}_N{}_{:.2f}r200c".format(z, N, rfrac)
     seed : float, optional
             Random seed to pass to HaloTools for generation of radial particle positions, and
             use for drawing concentrations and angular positions of particles. None for stocahstic
@@ -80,7 +81,7 @@ def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606, vis=False):
 
 if __name__ == '__main__':
 
-    zl, zs, N, rfrac, out_dir, vis = 0.2, 1.0, 10000, 6, './output', False
+    zl, zs, N, rfrac, out_dir, vis = 0.2, 1.0, 10000, 6, './output', True
     if(len(sys.argv) > 1): zl = float(sys.argv[1])
     if(len(sys.argv) > 2): zs = float(sys.argv[2])
     if(len(sys.argv) > 3): N = int(sys.argv[3])
