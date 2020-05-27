@@ -194,7 +194,6 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.', boots
     # otherwise
     fit_var = yt*sigmaCrit
 
-    
     binned_dsig = stats.binned_statistic(r, fit_var, statistic='mean', bins=rbins)
     binned_r = stats.binned_statistic(r, r, statistic='mean', bins=rbins)
 
@@ -337,7 +336,7 @@ def fit_nfw(lens, true_profile, makeplot=True, showfig=False, out_dir='.', boots
     cbar.set_label(r'$\mathrm{min}(\chi^2)/\chi^2$', fontsize=14)
     ax2.set_xlabel(r'$R_{200c}\>\>\left[\mathrm{Mpc}\right]$', fontsize=14)
     ax2.set_ylabel(r'$c_{200c}$', fontsize=14)
-    ax.set_xlim([0.2, 6])
+    ax.set_xlim([rmin+0.01, 6])
     ax.set_ylim([2, 300])
 
     plt.tight_layout()
@@ -446,7 +445,7 @@ if(__name__ == "__main__"):
     #         bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
     #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_zs', 
     #         bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
-    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_rfrac', 
-             bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
+    nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output4/vary_rfrac', 
+             bin_data=False, rmin=0, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
     #nfw_test(halo_cutout_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_N', 
     #         bin_data=False, rmin=0.2, makeplot=True, showfig=False, dont_skip_fit=dont_skip_fit, bootstrap=False)
