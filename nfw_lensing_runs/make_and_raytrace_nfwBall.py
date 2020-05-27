@@ -81,7 +81,7 @@ def raytrace_halo(halo_dir, lensing_dir=None, zs=[1.0], seed=606, vis=False):
 
 if __name__ == '__main__':
 
-    zl, zs, N, rfrac, out_dir, vis = 0.2, 1.0, 10000, 6, './output', True
+    zl, zs, N, rfrac, out_dir, vis = 0.2, 1.0, 20000, 8, './output', True
     if(len(sys.argv) > 1): zl = float(sys.argv[1])
     if(len(sys.argv) > 2): zs = float(sys.argv[2])
     if(len(sys.argv) > 3): N = int(sys.argv[3])
