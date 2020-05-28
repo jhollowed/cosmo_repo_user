@@ -4,15 +4,18 @@ import sys
 import h5py
 import glob
 import cycler
+import pickle
 import numpy as np
 from scipy import stats
 import matplotlib as mpl
 from matplotlib import rc
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from astropy.cosmology import FlatLambdaCDM
 cosmo = FlatLambdaCDM(H0=71, Om0=0.220, Ob0=0.02258*(0.71**2), name='OuterRim')
 
 sys.path.insert(0, "/Users/joe/repos/shearfit/shearfit")
+sys.path.insert(0, "/home/hollowed/repos/shearfit/shearfit")
 from analytic_profiles import NFW
 from astropy.cosmology import WMAP7
 from lensing_system import obs_lens_system
@@ -65,9 +68,9 @@ class nfw_profile_fitter:
             file, containing the intrinsic halo properties from the simulation.
         """
         
-        print('======= Initializing fitter object for dataset at {} ========'.format(halo_cutout_dir.split('/')[-1]))
+        print('\n\n======= Initializing fitter object for dataset at {} ========'.format(NFW_dir.split('/')[-1]))
         print('Finding lenses')
-        zlpl_dirs = np.array(glob.glob('{}/halo*'.format(halo_cutout_dir)))
+        zlpl_dirs = np.array(glob.glob('{}/halo*'.format(NFW_dir)))
         zl = np.array([float(d.split('/')[-1].split('zl')[-1].split('_')[0]) for d in zlpl_dirs])
         zs = np.array([float(d.split('/')[-1].split('zs')[-1].split('_')[0]) for d in zlpl_dirs])
         N = np.array([float(d.split('/')[-1].split('N')[-1].split('_')[0]) for d in zlpl_dirs])
@@ -82,7 +85,7 @@ class nfw_profile_fitter:
 
 
     def fit_halos(self, rmax = None, rmin = 0, single_halo_plots = False, bin_data=False, rbins=25, 
-                  bootstrap=False, dont_skip_fit=False):
+                  bootstrap=False, overwrite=False):
         """
        Use the shearfit package to fit the profiles of all halos present in NFW_dir, saving the resultinng differential
        surface mass profile and mass estimation to self.out_dir
@@ -111,7 +114,7 @@ class nfw_profile_fitter:
         bootstrap : bool, optional
             Whether or not to run bootstrap error estimation on the fitted profiles. Defaults to False, which is much
             faster.
-        dont_skip_fit : bool, optional
+        overwrite : bool, optional
             whether or not to force running of profile fits, even if already exist. If False, then this function does 
             nothing in the case that profile fitting outputs are already present in self.out_dir. This is simply to allow
             calling code the convenience of not having to comment out this function call if plotting etc. needs to be 
@@ -123,23 +126,40 @@ class nfw_profile_fitter:
             print('\nreading lensing mock data for lens zl={}, zs={}, N={}, rfrac={}'.format(
                     self.zl[i], self.zs[i], self.N[i], self.rfrac[i]))
             
-            # read lensing maps and scale rmin, rmax to Mpc
+            # read lensing maps and get FOV size
             [sim_lens, true_profile] = self._read_nfw_shears(self.zlpl_dirs[i])
+            
+            pfs = glob.glob('{}/properties.csv'.format(self.zlpl_dirs[i]))
+            assert len(pfs) == 1, "Exactly one properties file is expected in {}".format(self.zlpl_dirs[i])
+            props_file = pfs[0]
+            props = np.genfromtxt(props_file, delimiter=',', names=True)
+            fov_edge = props['boxRadius_Mpc']
             
             # loop over all chocies of rmin, rmax
             for j in range(len(rmin)):
                 for k in range(len(rmax)):
-                    if(rmax[k] is not None): this_rmax = true_profile.r200c * rmax[k]
-                    this_rmin = true_profile.r200c * rmin[j]
-
-                    self.output_suffix = 'zl{:.3f}_zs{:.3f}_N{}_fov{:.2f}_rmin{:.2f}_rmax{:.2f}'.format(
-                                          zl[i], zs[i], N[i], rfrac[i], this_rmin, this_rmax)
                     
-                    if(len(glob.glob('{}/*{}.npy'.format(self.out_dir, output_suffix))) == 0 or dont_skip_fit):
+                    # scale rmin, rmax to Mpc
+                    if(rmax[k] is None): this_rmax = fov_edge
+                    elif(rmax[k] > fov_edge): this_rmax = fov_edge
+                    else: this_rmax = true_profile.r200c * rmax[k]
+                    this_rmin = true_profile.r200c * rmin[j]
+                    assert this_rmin < this_rmax, "inner radial cut rmin cannot exceed outer radial cut rmax!"
+                    
+                    output_suffix = 'zl{:.3f}_zs{:.3f}_N{}_fov{:.2f}_rmin{:.2f}_rmax{:.2f}'.format(
+                                     self.zl[i], self.zs[i], self.N[i], self.rfrac[i], this_rmin, this_rmax)
+                    
+                    if(len(glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))) == 0 or overwrite):
+                       
                         if not os.path.exists(self.out_dir): os.makedirs(self.out_dir)
+                        else: [os.remove(obj) for obj in glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))]
+
+                        print('------------ fitting in radial range [{:.2f}, {:.2f}] Mpc ------------'.format(this_rmin, this_rmax))
                         self._fit_nfw(sim_lens, true_profile, rmin=this_rmin, rmax=this_rmax,
                                       make_plot=single_halo_plots, bin_data=bin_data, rbins=rbins, 
                                       bootstrap=bootstrap, sfx=output_suffix) 
+                    else:
+                        print('fitting files already exist; skipping')
         
     
     # ------------------------------------------------------------------------------------------------------------
@@ -211,14 +231,14 @@ class nfw_profile_fitter:
         k = k[mask]
         
         sim_lens = obs_lens_system(zl)
-        sim_lens.set_background(t1, t2, zs, y1=y1, y2=y2, k=k, rho=rho) 
+        sim_lens.set_background(t1, t2, zs, y1=y1, y2=y2, k=k) 
         return [sim_lens, true_profile]
 
     
     # ------------------------------------------------------------------------------------------------------------
     
 
-    def _fit_nfw(self, lens, true_profile, rmin, rmax, bin_data, r_bins, bootstrap, make_plot, sfx):
+    def _fit_nfw(self, lens, true_profile, rmin, rmax, bin_data, rbins, bootstrap, make_plot, sfx):
         """
         Calls the fitting routines in shearfit on the loaded data, saving the result to both numpy files and png figures
 
@@ -253,28 +273,24 @@ class nfw_profile_fitter:
         """
 
         zl = lens.zl
+        r200c = true_profile.r200c
+        m200c = true_profile.radius_to_mass()
+        c = true_profile.c
+        bg = lens.get_background()
+        r = bg['r']
+        rsamp = np.linspace(min(r), max(r), 1000)
         
         # fit the concentration and radius
         print('fitting with floating concentration')
         fitted_profile = NFW(0.75, 3.0, zl)
         fit(lens, fitted_profile, r200_bounds = [0.1, 15], conc_bounds = [1, 10], rmin=rmin, rmax=rmax, 
             bootstrap=bootstrap, bin_data=bin_data, bins=rbins)
-        if(bootstrap):
-            [dSigma_fitted, dSigma_fitted_err] = fitted_profile.delta_sigma(rsamp, bootstrap=True)
-        else:
-            dSigma_fitted = fitted_profile.delta_sigma(rsamp, bootstrap=False)
-            dSigma_fitted_err = np.zeros(len(dSigma_fitted))
 
         # and now do it again, iteratively using a c-M relation instead of fitting for c
         print('fitting with inferred c-M concentration')
         fitted_cm_profile = NFW(0.75, 3.0, zl)
         fit(lens, fitted_cm_profile, r200_bounds = [0.1, 15], cM_relation='child2018', rmin=rmin, rmax=rmax, 
             bootstrap=bootstrap, bin_data=bin_data, bins=rbins)
-        if(bootstrap):
-            [dSigma_fitted_cm, dSigma_fitted_cm_err] = fitted_cm_profile.delta_sigma(rsamp, bootstrap=True)
-        else:
-            dSigma_fitted_cm = fitted_cm_profile.delta_sigma(rsamp, bootstrap=False)
-            dSigma_fitted_cm_err = np.zeros(len(dSigma_fitted_cm))
         
         # write out fitting result
         print('r200c_fit = {:.4f}; m200c_fit = {:.4e}; c_fit = {:.2f}'.format(
@@ -284,21 +300,23 @@ class nfw_profile_fitter:
         print('r200c_true = {:.4f}; m200c_true = {:.4e}; c_true = {:.2f}'.format(r200c, m200c, c))
         
         # save fitted profiles
-        np.save('{}/fitted_profile_{}.npy'.format(self.out_dir, sfx), fitted_profile)
-        np.save('{}/cM_fitted_profile_{}.npy'.format(self.out_dir, sfx), fitted_cm_profile)
-        np.save('{}/true_profile{}.npy'.format(self.out_dir, sfx), true_profile)
+        fits = [fitted_profile, fitted_cm_profile, true_profile]
+        fit_dirs = ['fitted_profile', 'fitted_cm_profile', 'true_profile']
+        for i in range(len(fits)):
+            fit_file = open('{}/{}_{}.obj'.format(self.out_dir, fit_dirs[i], sfx), 'wb')
+            pickle.dump(fits[i], fit_file)
+
 
         if(not make_plot): return
-        else: self._plot_halo_profile(lens, true_profile, rmin, rmax, 
-                                      dSigma_fitted, dSigma_fitted_err, dSigma_fitted_cm, dSigma_fitted_cm_err, 
-                                      bin_data, rbins, sfx)
+        else: self._plot_halo_profile(lens, rmin, rmax, true_profile, fitted_profile, fitted_cm_profile, 
+                                      bootstrap, bin_data, rbins, sfx)
 
 
     # ------------------------------------------------------------------------------------------------------------
 
 
-    def _plot_halo_profile(lens, true_profile, rmin, rmax, dSigma_fitted, dSigma_fitted_err, dSigma_fitted_cm, 
-                           dSigma_fitted_cm_err, bin_data, rbins, sfx):
+    def _plot_halo_profile(self, lens, rmin, rmax, true_profile, fitted_profile, fitted_cm_profile,
+                           bootstrap, bin_data, rbins, sfx):
         """
         Plots a single halo profile, with points per-source, the true proile, and both fit variants. Includes a 
         second panel with a parameter sweep colormap.
@@ -307,8 +325,6 @@ class nfw_profile_fitter:
         ----------
         lens : obs_lens_system object instance
             A shearfit obs_lens_system object, containing source positions, redshfits, and lensing quantities
-        true_profile : NFW object instance
-            A shearfit NFW object, containing true input halo properties (to compare fit result)
         rmin : float
             The minimum radial distance of sources to include in the plot in Mpc (e.g. rmin = 0.3 will
             remove the inner 300kpc/h of source information). Defaults to 0.
@@ -317,14 +333,15 @@ class nfw_profile_fitter:
             trim the source popiulation beyond 2*r200c. Defaults to None, in which case rmax will automatically be 
             set to the full radial extent of the FOV as given in the NFW input. This default will also be imposed if
             the input rmax is greater than the size of the FOV.
-        dSigma_fitted : array
-            profile fit result as returned by NFW.delta_sigma in shearfit
-        dSigma_fitted_err : array
-            error in dSigma_fitted
-        dSigma_fitted_cm : array
-            profile fit result as returned by NFW.delta_sigma in shearfit, where a c-M relation was provided
-        dSigma_fitted_cm_err : array
-            error in dSigma_fitted_cm
+        true_profile : NFW object instance
+            A shearfit NFW object, containing true input halo properties (to compare fit result)
+        fitted_profile : shearfit NFW object
+            NFW object containing the final fitted form of the halo
+        fitted_cm_profile : shearfit NFW object
+            NFW object containing the final fitted form of the halo using the c-M relation during minimization
+        bootstrap : bool
+            Whether or not to run bootstrap error estimation on the fitted profiles. Defaults to False, which is much
+            faster.
         bin_data : bool
             whether or not to fits were done with shears averaged in radial bins, rather than to each individual source.
             Defaults to False.
@@ -334,42 +351,44 @@ class nfw_profile_fitter:
            Suffix to append to end of output filenames (for marking halo uniqueness)         
         """
         
-        zl = lens.zl
         r200c = true_profile.r200c
         m200c = true_profile.radius_to_mass()
         c = true_profile.c
+        
+        zl = lens.zl
         bg = lens.get_background()
-        sigmaCrit = lens.calc_sigma_crit()
-        yt = bg['yt']
         r = bg['r']
-        k = bg['k']
-        zs = bg['zs']
-
-        # do radius cuts and bin data
+        
+        # do radius cuts
         print('doing radial masking and binning')
-        if(rmax is None):
-            radial_mask = (r >= rmin)
-        else:
-            radial_mask = np.logical_and(r >= rmin, r <= rmax)
-        sigmaCrit = sigmaCrit[radial_mask]
-        yt = yt[radial_mask]
+        radial_mask = np.logical_and(r >= rmin, r <= rmax)
+       
         r = r[radial_mask]
-        k = k[radial_mask]
-        zs = zs[radial_mask]
+        sigmaCrit = lens.calc_sigma_crit()[radial_mask]
+        yt = bg['yt'][radial_mask]
+        k = bg['k'][radial_mask]
+        zs = bg['zs'][radial_mask]
         fit_var = yt*sigmaCrit # can change this to directly fir to surface density
         kk = k * sigmaCrit
-
-        rsamp = np.linspace(min(r), max(r), 1000)
-        dSigma_true = true_profile.delta_sigma(rsamp)
-        e = true_profile.sigma(r)
-        se = true_profile.delta_sigma(r)
         
         # get binned data
         binned_dsig = stats.binned_statistic(r, fit_var, statistic='mean', bins=rbins)
         binned_r = stats.binned_statistic(r, r, statistic='mean', bins=rbins)
         binned_kk = stats.binned_statistic(r, kk, statistic='mean', bins=rbins)
         binned_yt = stats.binned_statistic(r, yt, statistic='mean', bins=rbins)
-        
+
+        # get profiles from fit results
+        rsamp = np.linspace(min(r), max(r), 1000)
+        dSigma_true = true_profile.delta_sigma(rsamp)
+        if(bootstrap):
+            [dSigma_fitted, dSigma_fitted_err] = fitted_profile.delta_sigma(rsamp, bootstrap=True)
+            [dSigma_fitted_cm, dSigma_fitted_cm_err] = fitted_cm_profile.delta_sigma(rsamp, bootstrap=True)
+        else:
+            dSigma_fitted = fitted_profile.delta_sigma(rsamp, bootstrap=False)
+            dSigma_fitted_err = np.zeros(len(dSigma_fitted))
+            dSigma_fitted_cm = fitted_cm_profile.delta_sigma(rsamp, bootstrap=False)
+            dSigma_fitted_cm_err = np.zeros(len(dSigma_fitted_cm))
+         
         # now do a grid scan
         print('doing grid scan')
         gridscan_profile = NFW(0.75, 3.0, zl)
@@ -377,8 +396,8 @@ class nfw_profile_fitter:
         grid_c_bounds = [0.5, 10]
         [grid_pos, grid_res] = fit_gs(lens, gridscan_profile, r200_bounds = grid_r_bounds, conc_bounds = grid_c_bounds, 
                                       n=100, bin_data=bin_data, bins=rbins)
-        
-        # visualize results... 
+        # visualize results...
+        print('plotting')
         rc('text', usetex=True)
         color = plt.cm.plasma(np.linspace(0.2, 0.8, 3))
         mpl.rcParams['axes.prop_cycle'] = cycler.cycler('color', color)
@@ -392,14 +411,14 @@ class nfw_profile_fitter:
             ax.loglog(r/r200c, fit_var, 'xk', 
                     label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$', alpha=0.33)
         else:
-            ax.plot(binned_r[0]/r200c, binned_dsig[0], '-xk', 
+            ax.loglog(binned_r[0]/r200c, binned_dsig[0], '-xk', 
                     label=r'$\gamma_{\mathrm{NFW}} \Sigma_c$')
         
-        ax.plot(rR, dSigma_true, '--', label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+        ax.loglog(rR, dSigma_true, '--', label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
                                                 .format(r200c, c), color=color[0], lw=2)
-        ax.plot(rR, dSigma_fitted, label=r'$\Delta\Sigma_\mathrm{{fit}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+        ax.loglog(rR, dSigma_fitted, label=r'$\Delta\Sigma_\mathrm{{fit}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
                                             .format(fitted_profile.r200c, fitted_profile.c), color=color[1], lw=2)
-        ax.plot(rR, dSigma_fitted_cm, label=r'$\Delta\Sigma_{{\mathrm{{fit}},c-M}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+        ax.loglog(rR, dSigma_fitted_cm, label=r'$\Delta\Sigma_{{\mathrm{{fit}},c-M}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
                                                .format(fitted_cm_profile.r200c, fitted_cm_profile.c), 
                                                color=color[2], lw=2)
         ax.fill_between(rR, dSigma_fitted - dSigma_fitted_err.T[0], 
@@ -451,14 +470,14 @@ class nfw_profile_fitter:
 
         if(bin_data): binstr = '_{}bins_'.format(rbins)
         else: binstr = '_'
-        f.savefig('{}/shearprof_fit{}{}rmin_{}.png'.format(
-                   self.ut_dir, binstr, rmin, sfx), dpi=300)
+        f.savefig('{}/shearprof_fit{}_{}.png'.format(
+                   self.out_dir, binstr, sfx), dpi=300)
     
         
     # ------------------------------------------------------------------------------------------------------------
 
 
-    def plot_convergence_results_mass(self, vary_var):
+    def plot_mass_convergence(self, vary_var):
         '''
         Plot the mass estimated from many runs of fit_halos(), results of which are found in self.out_dir
 
@@ -470,20 +489,23 @@ class nfw_profile_fitter:
             assumed that user has ensured that all output subdirs in self.out_dir have only one of these variables
             changing, to make for a meaningul convergence study.
         '''
-        
-        fit_out = glob.glob('{}/fitted_profile*.npy'.format(self.out_dir))
-        m = np.array([np.load(f).radius_to_mass() for f in fit_out])
-        cmfit_out = glob.glob('{}/cM_fitted_profile*.npy'.format(self.out_dir))
-        m_cm = np.array([np.load(f).radius_to_mass() for f in cmfit_out])
-        truth_out = glob.glob('{}/true*.npy'.format(self.out_dir))
-        m_true = np.array([np.load(f)i.radius_to_mass() for f in truth_out])
-        
-        vary_val_m = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.npy')) 
+      
+        print('\n--------------- reading fits and plotting convergence ---------------\n')
+
+        fit_out = glob.glob('{}/fitted_profile*.obj'.format(self.out_dir))
+        m = np.array([pickle.load(open(f, 'rb')).radius_to_mass() for f in fit_out])
+        cmfit_out = glob.glob('{}/fitted_cm_profile*.obj'.format(self.out_dir))
+        m_cm = np.array([pickle.load(open(f, 'rb')).radius_to_mass() for f in cmfit_out])
+        truth_out = glob.glob('{}/true*.obj'.format(self.out_dir))
+        m_true = np.array([pickle.load(open(f, 'rb')).radius_to_mass() for f in truth_out])
+       
+        vary_val_m = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
                                for f in fit_out])
-        vary_val_cm = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.npy')) 
+        vary_val_cm = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
                                 for f in cmfit_out])
-        vary_val_truth = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.npy')) 
+        vary_val_truth = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
                                    for f in truth_out])
+
         sm = np.argsort(vary_val_m)
         scm = np.argsort(vary_val_cm)
         st = np.argsort(vary_val_truth)
@@ -494,25 +516,125 @@ class nfw_profile_fitter:
         ax.plot(vary_val_m[sm], m[sm]/m_true[st], '-dr', label="unconstrained fit")
         ax.plot(vary_val_cm[scm], m_cm[scm]/m_true[st], '-db', label="c-M relation fit")
 
-        var_strs = {'zl',r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
+        var_strs = {'zl':r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
                     'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation$', 'rmin':r'$r_{\mathrm{fit,min}}$', 
                     'rmax':r'$r_{\mathrm{fit,max}}$'}
 
-        ax.set_xlabel(vary_strs[vary_var], fontsize=14)
+        ax.set_xlabel(var_strs[vary_var], fontsize=14)
         ax.set_ylabel(r'$m_{200c,\mathrm{fit}} / m_{200c,\mathrm{truth}}$', fontsize=14)
         ax.legend()
-        plt.savefig('convergence_tests/{}_convergence_mass2.png'.format(vary_var), dpi=300)
+        plt.savefig('{}/{}_mass_convergence.png'.format(self.out_dir, vary_var), dpi=300)
 
+    
+    # ------------------------------------------------------------------------------------------------------------
+
+
+    def plot_profile_convergence(self, vary_var):
+        '''
+        Plot the halo profiles from many runs of fit_halos(), results of which are found in self.out_dir
+
+        Parameters
+        ---------
+        vary_var : string
+            which variable to plot convergence with respect to. This should be one of the quantities given in the 
+            output directory suffix as defined in fit_halos(). Choices are: zl, zs, N, fov, rmin, rmax. It is 
+            assumed that user has ensured that all output subdirs in self.out_dir have only one of these variables
+            changing, to make for a meaningul convergence study.
+        '''
+        
+        print('\n--------------- reading fits and plotting convergence ---------------\n')
+
+        fit_out = glob.glob('{}/fitted_profile*.obj'.format(self.out_dir))
+        fitted_profiles = np.array([pickle.load(open(f, 'rb')) for f in fit_out])
+        truth_out = glob.glob('{}/true*.obj'.format(self.out_dir))[0]
+        true_profile = pickle.load(open(truth_out, 'rb'))
+        
+        # get profiles from fit results -- no bootstrap errors here
+        rsamp = np.linspace(min(r), max(r), 1000)
+        dSigma_true = true_profile.delta_sigma(rsamp, bootstrap=False)
+        dSigma_fitted = [p.delta_sigma(rsamp, bootstrap=False) for p in fitted_profiles]
+       
+        # sort profiles by increasing vary_val
+        vary_val = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
+                               for f in fit_out])
+        sorter = np.argsort(vary_val_m)
+        vary_val = vary_val_m[sorter]
+        dSigma_fitted = dSigma_fitted[sorter]
+       
+        # plot
+        colors = plt.cm.plasma(np.linspace(0, 1, len(dSigma_true)))
+        for i in range(len(dSigma_fitted)):
+            ax.loglogi(rR, dSigma_fitted[i], color=colors[i], lw=2)
+        ax.loglog(rR, dSigma_true, '--', label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+                                                .format(r200c, c), color=color[0], lw=2) 
+
+        # format
+        ax.legend(fontsize=12, loc='best')
+        ax.set_xlabel(r'$r/R_{200c}$', fontsize=14)
+        ax.set_ylabel(r'$\Delta\Sigma\>\>\lbrack\mathrm{M}_\odot\mathrm{pc}^{-2}\rbrack$', fontsize=14)
+        ax.set_title(r'$z_\mathrm{{lens}} = {}$'.format(zl), fontsize=14)
+
+        # plot convergence in the radius-concentration plane
+        ax2 = f.add_subplot(122)
+        ax2.plot([r200c], [c], 'xk', ms=10, label=r'$\mathrm{{truth}}$')
+       
+        all_r200c = [p.r200c for p in fitted_profiles]
+        all_r200c_err = [p.r200c_err for p in fitted_profiles]
+        all_c = [p.c for p in fitted_profiles]
+        all_c = [p.c_err for p in fitted_profiles] 
+        ax2.plot(all_r200c, all_c, '--k')
+        for i in range(len(all_c)):
+            ax2.errorbar(all_r200c[i], all_c[i], xerr=all_r200c_err[i], yerr=all_c_err[i], 
+                         ms=10, marker='.', c=colors[i])
+
+        # include c-M relation curve
+        tmp_profile = NFW(1,1,zl)
+        tmp_m200c = np.zeros(len(grid_pos[0][0]))
+        for i in range(len(tmp_m200c)):
+            tmp_profile.r200c = grid_pos[0][0][i]
+            tmp_m200c[i] = tmp_profile.radius_to_mass()
+        tmp_c, tmp_dc = cm(tmp_m200c, zl, cosmo)
+        ax2.plot(grid_pos[0][0], tmp_c, '--k', lw=2, label=r'$c\mathrm{-}M\mathrm{\>relation\>(Child+2018)}$')
+        ax2.fill_between(grid_pos[0][0], tmp_c - tmp_dc, tmp_c + tmp_dc, color='k', alpha=0.1, lw=0)
+
+        # format
+        ax2.set_xlim(grid_r_bounds)
+        ax2.set_ylim(grid_c_bounds)
+        ax2.legend(fontsize=12, loc='upper right')
+        ax2.set_xlabel(r'$R_{200c}\>\>\left[\mathrm{Mpc}\right]$', fontsize=14)
+        ax2.set_ylabel(r'$c_{200c}$', fontsize=14)
+        ax.set_xlim([0.2, 6])
+        ax.set_ylim([2, 300])
+        
+        cmap = mpl.cm.viridis
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=min(vary_val), vmax=max(vary_val))
+        cbar = plt.colorbar(sm)
+        
+        var_strs = {'zl':r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
+                    'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation$', 'rmin':r'$r_{\mathrm{fit,min}}$', 
+                    'rmax':r'$r_{\mathrm{fit,max}}$'}
+        cbar.set_label(var_strs[vary_var], fontsize=14)
+        plt.tight_layout() 
+
+        f.savefig('{}/{}_profile_convergence.png'.format(
+                   self.out_dir, varty_var), dpi=300)
+
+
+
+# =====================================================================================================================
+# =====================================================================================================================
 
 
 
 if(__name__ == "__main__"):
    
-    # turn to true to force overwrite pre-existing fits
-    dont_skip_fit = False
+    # turn to True to force overwrite pre-existing fits
+    overwrite = True
     
     # run all convergence tests
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_rmax')
-    fitter.fit_halos(rmax=None, rmin=0.2, single_halo_plot=True, dont_skip_fit=dont_skip_fit)
-    fitter.plot_convergnce_results_mass(cary_var='rmax')
+    #fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output2/vary_rmax')
+    fitter = nfw_profile_fitter(NFW_dir = '/projects/DarkUniverse_esp/jphollowed/profile_fitting_tests/convergence_tests/vary_rmax')
+    fitter.fit_halos(rmax=[1.5], rmin=[0.2], single_halo_plots=True, overwrite=overwrite)
+    #fitter.fit_halos(rmax=[0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5], rmin=[0.2], single_halo_plots=True, overwrite=overwrite)
+    fitter.plot_mass_convergence(vary_var='rmax')
 

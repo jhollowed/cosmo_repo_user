@@ -39,7 +39,7 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, nsrcs=10000, vis=False, out_dir=
     '''
     out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c".format(out_dir, zl, zs, N, rfrac))
    
-    print('\n\n=============== working on halo at {} ==============='.format(ou_tdir.split('/')[-1]))
+    print('\n\n=============== working on halo at {} ==============='.format(out_dir.split('/')[-1]))
     print('Populating halo with particles')
     halo = NFW(m200c = 1e14, z=zl, seed=seed)
     halo.populate_halo(N=N, rfrac=rfrac)
