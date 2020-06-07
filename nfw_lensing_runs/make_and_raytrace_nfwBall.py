@@ -10,7 +10,7 @@ from raytrace_simple_halo import raytracer
 # ===============================================================================
 
 
-def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, nsrcs=10000, vis=False, out_dir='./output', seed=606):
+def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=None, nsrcs=10000, vis=False, out_dir='./output', seed=606):
     '''
     Generate an NFW particle distribution and place it at a redshift z via the mathods in mpwl_raytrace
 
@@ -24,6 +24,9 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, nsrcs=10000, vis=False, out_dir=
         number of particles to draw; defaults to 10000
     rfarc : float, optional
         physical extent of generated particle set in units of r200c; defaults to 6
+    rfarc_los : float, optional
+        physical extent of generated particle set in units of r200c in the line-of-sight dimension. 
+        Defaults to None, in which case it is set to match rfrac
     nsrcs : int
         Number of sources to place on the source plane. Defaults to 10000
     vis : bool, optional
@@ -37,12 +40,13 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, nsrcs=10000, vis=False, out_dir=
             use for drawing concentrations and angular positions of particles. None for stocahstic
             results
     '''
-    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c".format(out_dir, zl, zs, N, rfrac))
+    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos".format(
+                             out_dir, zl, zs, N, rfrac, rfrac_los))
    
     print('\n\n=============== working on halo at {} ==============='.format(out_dir.split('/')[-1]))
     print('Populating halo with particles')
     halo = NFW(m200c = 1e14, z=zl, seed=seed)
-    halo.populate_halo(N=N, rfrac=rfrac)
+    halo.populate_halo(N=N, rfrac=rfrac, rfrac_los=rfrac_los)
     print('writing out')
     halo.output_particles(output_dir = out_dir, vis_debug=vis)
     
@@ -84,7 +88,10 @@ def raytrace_halo(halo_dir, nsrcs, lensing_dir=None, zs=[1.0], seed=606, vis=Fal
 
 if __name__ == '__main__':
 
-    zl, zs, N, rfrac, nsrcs, out_dir, vis = 0.2, 1.0, 20000, 6, 10000, './output', True
+    # default params
+    zl, zs, N, rfrac, nsrcs, out_dir, vis, rfrac_los = 0.2, 1.0, 20000, 6, 10000, './output', True, None
+
+    # override default by argv
     if(len(sys.argv) > 1): zl = float(sys.argv[1])
     if(len(sys.argv) > 2): zs = float(sys.argv[2])
     if(len(sys.argv) > 3): N = int(sys.argv[3])
@@ -92,5 +99,6 @@ if __name__ == '__main__':
     if(len(sys.argv) > 5): nsrcs = float(sys.argv[5])
     if(len(sys.argv) > 6): out_dir = sys.argv[6]
     if(len(sys.argv) > 7): vis = bool(sys.argv[7])
+    if(len(sys.argv) > 8): rfrac_los = float(sys.argv[8])
 
-    make_halo(zl, zs, N, rfrac, nsrcs=nsrcs, out_dir=out_dir, vis=vis)
+    make_halo(zl, zs, N, rfrac, nsrcs=nsrcs, out_dir=out_dir, vis=vis, rfrac_los = rfrac_los)
