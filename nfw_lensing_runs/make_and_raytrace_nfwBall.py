@@ -22,9 +22,9 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=None, nsrcs=10000, vis
         redshift of sources; defaults to 1.0
     N : int, optional
         number of particles to draw; defaults to 10000
-    rfarc : float, optional
+    rfrac : float, optional
         physical extent of generated particle set in units of r200c; defaults to 6
-    rfarc_los : float, optional
+    rfrac_los : float, optional
         physical extent of generated particle set in units of r200c in the line-of-sight dimension. 
         Defaults to None, in which case it is set to match rfrac
     nsrcs : int
@@ -40,9 +40,13 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=None, nsrcs=10000, vis
             use for drawing concentrations and angular positions of particles. None for stocahstic
             results
     '''
-    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos".format(
-                             out_dir, zl, zs, N, rfrac, rfrac_los))
-   
+
+    if(rfrac_los is None):
+        out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c".format(out_dir, zl, zs, N, rfrac))
+    else:
+        out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos".format(
+                                 out_dir, zl, zs, N, rfrac, rfrac_los))
+
     print('\n\n=============== working on halo at {} ==============='.format(out_dir.split('/')[-1]))
     print('Populating halo with particles')
     halo = NFW(m200c = 1e14, z=zl, seed=seed)
@@ -101,4 +105,4 @@ if __name__ == '__main__':
     if(len(sys.argv) > 7): vis = bool(sys.argv[7])
     if(len(sys.argv) > 8): rfrac_los = float(sys.argv[8])
 
-    make_halo(zl, zs, N, rfrac, nsrcs=nsrcs, out_dir=out_dir, vis=vis, rfrac_los = rfrac_los)
+    make_halo(zl, zs, N, rfrac, nsrcs=nsrcs, out_dir=out_dir, vis=vis, rfrac_los=rfrac_los)
