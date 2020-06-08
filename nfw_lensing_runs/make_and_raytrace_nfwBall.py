@@ -9,8 +9,8 @@ from raytrace_simple_halo import raytracer
 
 # ===============================================================================
 
-
-def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=None, nsrcs=10000, vis=False, out_dir='./output', seed=606):
+def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6, 
+              nsrcs=10000, lenspix=1024, vis=False, out_dir='./output', seed=606):
     '''
     Generate an NFW particle distribution and place it at a redshift z via the mathods in mpwl_raytrace
 
@@ -29,6 +29,9 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=None, nsrcs=10000, vis
         Defaults to None, in which case it is set to match rfrac
     nsrcs : int
         Number of sources to place on the source plane. Defaults to 10000
+    lenspix : int
+        Number of pixels on one side of the grid on which to compute density and lensing quantities
+        (total number of pixels is lenspix^2)
     vis : bool, optional
         flag to send to make_simple_halo to generate a figure of the NFW particles or not
     out_dir : str, optinal
@@ -41,11 +44,8 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=None, nsrcs=10000, vis
             results
     '''
 
-    if(rfrac_los is None):
-        out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c".format(out_dir, zl, zs, N, rfrac))
-    else:
-        out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos".format(
-                                 out_dir, zl, zs, N, rfrac, rfrac_los))
+    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos_{}_nsrcs{}_lenspix{}".format(
+                             out_dir, zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix))
 
     print('\n\n=============== working on halo at {} ==============='.format(out_dir.split('/')[-1]))
     print('Populating halo with particles')
@@ -54,13 +54,13 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=None, nsrcs=10000, vis
     print('writing out')
     halo.output_particles(output_dir = out_dir, vis_debug=vis)
     
-    raytrace_halo(out_dir, zs=[zs], vis=vis, nsrcs=nsrcs)
+    raytrace_halo(out_dir, zs=[zs], vis=vis, nsrcs=nsrcs, lenspix=lenspix)
 
 
 # ===============================================================================
 
 
-def raytrace_halo(halo_dir, nsrcs, lensing_dir=None, zs=[1.0], seed=606, vis=False):
+def raytrace_halo(halo_dir, nsrcs, lenspix, lensing_dir=None, zs=[1.0], seed=606, vis=False):
     '''
     Compute lensing maps for an NFW particle distribution for a single lens plane and a source population zs
 
@@ -68,6 +68,11 @@ def raytrace_halo(halo_dir, nsrcs, lensing_dir=None, zs=[1.0], seed=606, vis=Fal
     ----------
     halo_dir : str
         location of output of make_halo output (out_dir arg in make_halo())
+    nsrcs : int
+        Number of sources to place on the source plane. Defaults to 10000
+    lenspix : int
+        Number of pixels on one side of the grid on which to compute density and lensing quantities
+        (total number of pixels is lenspix^2)
     lensing_dir : str, optional
         location for lensing output, does not have to exist; defaults to 
         "{}/lensing_maps/zs_{}".format(halo_dir, zs)
@@ -84,7 +89,7 @@ def raytrace_halo(halo_dir, nsrcs, lensing_dir=None, zs=[1.0], seed=606, vis=Fal
     
     print('raytracing from zs = {}'.format(zs))
     rt = raytracer(halo_dir, lensing_dir, zs, seed=seed)
-    rt.halo_raytrace(nsrcs)
+    rt.halo_raytrace(nsrcs, lenspix)
     if(vis):
         print('drawing lensing maps'.format(zs))
         rt.vis_outputs()
@@ -93,16 +98,18 @@ def raytrace_halo(halo_dir, nsrcs, lensing_dir=None, zs=[1.0], seed=606, vis=Fal
 if __name__ == '__main__':
 
     # default params
-    zl, zs, N, rfrac, nsrcs, out_dir, vis, rfrac_los = 0.2, 1.0, 20000, 6, 10000, './output', True, None
+    zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix, out_dir, vis = \
+        0.2, 1.0, 20000, 6, None, 10000, 1024, './output', True
 
     # override default by argv
     if(len(sys.argv) > 1): zl = float(sys.argv[1])
     if(len(sys.argv) > 2): zs = float(sys.argv[2])
     if(len(sys.argv) > 3): N = int(sys.argv[3])
     if(len(sys.argv) > 4): rfrac = float(sys.argv[4])
+    if(len(sys.argv) > 8): rfrac_los = float(sys.argv[8])
     if(len(sys.argv) > 5): nsrcs = float(sys.argv[5])
+    if(len(sys.argv) > 5): lenspix = float(sys.argv[5])
     if(len(sys.argv) > 6): out_dir = sys.argv[6]
     if(len(sys.argv) > 7): vis = bool(sys.argv[7])
-    if(len(sys.argv) > 8): rfrac_los = float(sys.argv[8])
 
-    make_halo(zl, zs, N, rfrac, nsrcs=nsrcs, out_dir=out_dir, vis=vis, rfrac_los=rfrac_los)
+    make_halo(zl, zs, N, rfrac, rfraclos, nsrcs, lenspix, out_dir, vis)

@@ -10,6 +10,7 @@ from scipy import stats
 import matplotlib as mpl
 from matplotlib import rc
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from astropy.cosmology import FlatLambdaCDM
 cosmo = FlatLambdaCDM(H0=71, Om0=0.220, Ob0=0.02258*(0.71**2), name='OuterRim')
@@ -69,18 +70,26 @@ class nfw_profile_fitter:
         """
         
         print('\n\n======= Initializing fitter object for dataset at {} ========'.format(NFW_dir.split('/')[-1]))
-        print('Finding lenses')
         zlpl_dirs = np.array(glob.glob('{}/halo*'.format(NFW_dir)))
         zl = np.array([float(d.split('/')[-1].split('zl')[-1].split('_')[0]) for d in zlpl_dirs])
         zs = np.array([float(d.split('/')[-1].split('zs')[-1].split('_')[0]) for d in zlpl_dirs])
         N = np.array([float(d.split('/')[-1].split('N')[-1].split('_')[0]) for d in zlpl_dirs])
         rfrac = np.array([float(d.split('/')[-1].split('r200c')[0].split('_')[-1]) for d in zlpl_dirs])
         rfrac_los = np.array([float(d.split('/')[-1].split('r200clos')[0].split('_')[-1]) for d in zlpl_dirs])
+        lenspix = np.array([float(d.split('/')[-1].split('lensgrid')[0].split('_')[-1]) for d in zlpl_dirs])
+        nsrcs = np.array([float(d.split('/')[-1].split('nsrcs')[0].split('_')[-1]) for d in zlpl_dirs])
+        print('Found {} lenses'.format(len(zl)))
         
         sort = np.argsort(zl)
-        self.zlpl_dirs, self.zl, self.zs, self.N, self.rfrac, self.rfrac_los = zlpl_dirs[sort], zl[sort], 
-                                                         zs[sort], N[sort], rfrac[sort], rfrac_los[sort]
+        self.zlpl_dirs, self.zl, self.zs, self.N, self.rfrac, self.rfrac_los, self.nsrcs, self.lenspix = \
+            zlpl_dirs[sort], zl[sort], zs[sort], N[sort], rfrac[sort], rfrac_los[sort], lenspix[sort]
         self.out_dir = '{}/profile_fits'.format(NFW_dir)
+        
+        self.var_strs = {'zl':r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
+                         'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation$', 
+                         'rmin':r'$r_{\mathrm{fit,min}}$', 'rmax':r'$r_{\mathrm{fit,max}}$',
+                         'losclip':r'$\Delta z_\mathrm{clip}$', 'nsrcs':r'$N\>\mathrm{sources}$',
+                         }
 
     
     # ------------------------------------------------------------------------------------------------------------
@@ -89,8 +98,8 @@ class nfw_profile_fitter:
     def fit_halos(self, rmax = None, rmin = 0, bootstrap = False, bin_data = False, rbins = 25, 
                   overwrite = False, inputs = 'mocks', single_halo_plots = False, grid_scan = True, grid_N = 100):
         """
-       Use the shearfit package to fit the profiles of all halos present in NFW_dir, saving the resultinng differential
-       surface mass profile and mass estimation to self.out_dir
+       Use the shearfit package to fit the profiles of all halos present in NFW_dir, saving the resultinng 
+       differential surface mass profile and mass estimation to self.out_dir
 
         Parameters
         ----------
@@ -158,10 +167,10 @@ class nfw_profile_fitter:
                     this_rmin = true_profile.r200c * rmin[j]
                     assert this_rmin < this_rmax, "inner radial cut rmin cannot exceed outer radial cut rmax!"
                     
-                    output_suffix = 'zl{:.3f}_zs{:.3f}_N{}_fov{:.2f}_losClip{}_rmin{:.2f}_rmax{:.2f}_{}'.format(
-                                     self.zl[i], self.zs[i], self.N[i], self.rfrac[i], self.rfrac_los, 
+                    output_suffix = 'zl{:.2f}_zs{:.2f}_N{}_fov{:.2f}_losClip{}_rmin{:.2f}_rmax{:.2f}_{}'.format(
+                                     self.zl[i], self.zs[i], self.N[i], self.rfrac[i], self.rfrac_los[i], 
                                      this_rmin, this_rmax, inputs)
-                    
+                   
                     if(len(glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))) == 0 or overwrite):
                        
                         if not os.path.exists(self.out_dir): os.makedirs(self.out_dir)
@@ -275,7 +284,7 @@ class nfw_profile_fitter:
         sim_lens.set_background(t1, t2, zs, y1=y1, y2=y2, k=k)
         
         # temporary for Lindsey
-        writeout=True
+        writeout=False
         if(writeout):
             print('writing sources out')
             from astropy.io import fits
@@ -439,7 +448,7 @@ class nfw_profile_fitter:
         k = bg['k']
         zs = bg['zs']
         if(bin_data):
-            binned_data = lens.calc_sigma_binned(nbins=rbins, return_edges=True, 
+            binned_data = lens.calc_delta_sigma_binned(nbins=rbins, return_edges=True, 
                                                  return_std=True, return_gradients=True)
             delsig = binned_data['delta_sigma_mean']
             r = binned_data['r_mean']
@@ -464,8 +473,12 @@ class nfw_profile_fitter:
         color = plt.cm.plasma(np.linspace(0.2, 0.8, 3))
         mpl.rcParams['axes.prop_cycle'] = cycler.cycler('color', color)
 
-        f = plt.figure(figsize=(12,6))
-        ax = f.add_subplot(121)
+        if(grid_scan): 
+            f = plt.figure(figsize=(12,6))
+            ax = f.add_subplot(121)
+        else: 
+            f = plt.figure(figsize=(6,6))
+            ax = f.add_subplot(111)
         rR = rsamp/r200c
       
         # ----- plot data -----
@@ -474,11 +487,13 @@ class nfw_profile_fitter:
             delsig_err = binned_data['delta_sigma_se_mean']
             r_std = binned_data['r_std']
             r_err = binned_data['r_se_mean']
-            ax.errorbar(r/r200c, delsig, xerr=r_std, y_std=delsig_err, fmt='none', capsize=10, 
-                        label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>\mathrm{bin\>STD}$')
-            ax.errorbar(r/r200c, delsig, xerr=r_err, y_err=delsig_err, fmt='none', ecolor='k', 
+            bin_widths = np.diff(binned_data['bin_edges'])
+            
+            ax.errorbar(r/r200c, delsig, xerr=bin_widths/2/r200c, yerr=delsig_std, fmt='none', capsize=2, color='k',
+                        label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>y:\mathrm{std},\>x:\mathrm{bin\>width},$')
+            ax.errorbar(r/r200c, delsig, xerr=r_err/r200c, yerr=delsig_err, fmt='none', ecolor='k', 
                         elinewidth=6, alpha=0.2, label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>\mathrm{bin\>SEM}$')
-            ax.plot(r/r200c, delsig, '--k', ms=3, label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$')
+            ax.plot(r/r200c, delsig, '--k', ms=10, label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$')
             
         else:
             ax.loglog(r/r200c, delsig, 'xk', label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$', alpha=0.33)
@@ -599,11 +614,7 @@ class nfw_profile_fitter:
         ax.plot(vary_val_m[sm], m[sm]/m_true[st], '-dr', label="unconstrained fit")
         ax.plot(vary_val_cm[scm], m_cm[scm]/m_true[st], '-db', label="c-M relation fit")
 
-        var_strs = {'zl':r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
-                    'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation$', 'rmin':r'$r_{\mathrm{fit,min}}$', 
-                    'rmax':r'$r_{\mathrm{fit,max}}$'}
-
-        ax.set_xlabel(var_strs[vary_var], fontsize=14)
+        ax.set_xlabel(self.var_strs[vary_var], fontsize=14)
         ax.set_ylabel(r'$m_{200c,\mathrm{fit}} / m_{200c,\mathrm{truth}}$', fontsize=14)
         ax.legend()
         
@@ -720,10 +731,7 @@ class nfw_profile_fitter:
         sm._A = []
         cbar = plt.colorbar(sm)
         
-        var_strs = {'zl':r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
-                    'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation$', 
-                    'rmin':r'$r_{\mathrm{fit,min}}$', 'rmax':r'$r_{\mathrm{fit,max}}$'}
-        cbar.set_label(var_strs[vary_var], fontsize=14)
+        cbar.set_label(self.var_strs[vary_var], fontsize=14)
         plt.tight_layout() 
 
         if(sfx is None):
@@ -735,7 +743,8 @@ class nfw_profile_fitter:
     # ------------------------------------------------------------------------------------------------------------
 
 
-    def plot_data_convergence(self, vary_var, rmin=0, rmax=None, bin_data=False, rbins=25, sfx=None):
+    def plot_data_convergence(self, vary_var, rmin=0, rmax=None, bin_data=False, rbins=25, sfx=None, 
+                              plot_gradient=False):
         '''
         Plot the scaled shear data from many runs of fit_halos(), results of which are found in self.out_dir
 
@@ -763,6 +772,8 @@ class nfw_profile_fitter:
         sfx : string, optional
             Suffix to add to output figure filename (to prevent overwrites if testing convergence on different 
             ranges of one variable). Default is None.
+        plot_gradient : bool, optional
+            Whether or not to render a second subplot which displays the gradient of each bin. Defaults to False.
         '''
         
         print('\n--------------- reading sources and plotting data convergence ---------------')
@@ -772,11 +783,10 @@ class nfw_profile_fitter:
         true_profile = pickle.load(open(truth_out, 'rb'))
         r200c = true_profile.r200c
         c = true_profile.c
-        zl = true_profile.zl 
-        dSigma_true = true_profile.delta_sigma(rsamp_full, bootstrap=False)
+        zl = true_profile.zl
 
         # find and sort lenses by increasing vary_val
-        sources_out = glob.glob('{}/fitted_profile*.obj'.format(self.out_dir))
+        sources_out = glob.glob('{}/source_data*.obj'.format(self.out_dir))
         lenses = np.array([pickle.load(open(f, 'rb')) for f in sources_out])        
        
         vary_val = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
@@ -786,12 +796,16 @@ class nfw_profile_fitter:
         lenses = lenses[sorter]
         
         # prepare figure
-        colors = plt.cm.viridis(np.linspace(0, 1, len(lens)))
+        colors = plt.cm.viridis(np.linspace(0, 1, len(lenses)))
         f = plt.figure(figsize=(6,6))
-        ax = f.add_subplot(111)
-        ax.loglog(rsamp_full/r200c, dSigma_true, '--', 
-                  label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
-                                                      .format(r200c, c), color='k', lw=2)
+        data_lw = 0.85
+        data_ms = 3
+        if(plot_gradient):
+            spec = gridspec.GridSpec(ncols=1, nrows=4, figure=f)
+            ax = f.add_subplot(spec[:-1,0])
+            ax2 = f.add_subplot(spec[-1,0])
+        else:
+            ax = f.add_subplot(111)
         
         # read data and plot for each lens
         for i in range(len(lenses)):
@@ -805,7 +819,7 @@ class nfw_profile_fitter:
             k = bg['k']
             zs = bg['zs']
             if(bin_data):
-                binned_data = lens.calc_sigma_binned(nbins=rbins, return_edges=True, 
+                binned_data = lens.calc_delta_sigma_binned(nbins=rbins, return_edges=True, 
                                                      return_std=True, return_gradients=True)
                 delsig = binned_data['delta_sigma_mean']
                 r = binned_data['r_mean']
@@ -818,50 +832,59 @@ class nfw_profile_fitter:
                 delsig_err = binned_data['delta_sigma_se_mean']
                 r_std = binned_data['r_std']
                 r_err = binned_data['r_se_mean']
-                ax.errorbar(r/r200c, delsig, xerr=r_std, y_std=delsig_err, fmt='none', capsize=10, 
-                            ecolor=colors[i])
-                ax.errorbar(r/r200c, delsig, xerr=r_err, y_err=delsig_err, fmt='none', ecolor=colors[i],
+                bin_widths = np.diff(binned_data['bin_edges'])
+                ax.errorbar(r/r200c, delsig, xerr=bin_widths/2/r200c, yerr=delsig_std, fmt='none', capsize=2, 
+                            ecolor=colors[i], elinewidth=data_lw, capthick=data_lw)
+                ax.errorbar(r/r200c, delsig, xerr=r_err/r200c, yerr=delsig_err, fmt='none', ecolor=colors[i],
                             elinewidth=6, alpha=0.2)
-                ax.plot(r/r200c, delsig, '--', c=colors[i], ms=3) 
+                ax.plot(r/r200c, delsig, '-o', c=colors[i], lw=data_lw, ms=data_ms) 
             else:
-                ax.loglog(r/r200c, delsig, 'x', c=colors[i], alpha=0.33)
+                ax.plot(r/r200c, delsig, 'x', c=colors[i], alpha=0.33, ms=data_ms)
         
-
+            # plot bin gradients
+            if(plot_gradient):
+                grad = binned_data['bin_grad']
+                ax2.plot(r/r200c, grad, '-x', c=colors[i], lw=data_lw, ms=data_ms)
+         
+        # dummy plot to get error bars in legend exaxctly once
+        ax.errorbar(-100, -100, xerr=1, y_std=1, fmt='none', capsize=2, ecolor='k', elinewidth=data_lw,
+                    label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>y:\mathrm{std},\>x:\mathrm{bin\>width},$')
+        ax.errorbar(-100, -100, xerr=10, y_err=10, fmt='none', ecolor='k', elinewidth=6, alpha=0.2, 
+                    label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>\mathrm{bin\>sem}$')
+        ax.plot(-100, -100, '-ok', label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$', lw=data_lw, ms=data_ms) 
+        
+        # plot true profile
+        ax.set_xlim([0.2, 6])
+        ax.set_ylim([2, 300])
+        rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000)
+        dSigma_true = true_profile.delta_sigma(rsamp, bootstrap=False)
+        ax.plot(rsamp/r200c, dSigma_true, '--', 
+                label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+                                                      .format(r200c, c), color='k', lw=1.5) 
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        
         # ----- format -----
         ax.set_xlabel(r'$r/R_{200c}$', fontsize=14)
         ax.set_ylabel(r'$\Delta\Sigma\>\>\lbrack\mathrm{M}_\odot\mathrm{pc}^{-2}\rbrack$', fontsize=14)
         ax.set_title(r'$z_\mathrm{{lens}} = {}$'.format(zl), fontsize=14)
+        ax.legend(fontsize=8, loc='best')
+        if(plot_gradient):
+            ax2.set_xlabel(r'$r/R_{200c}$', fontsize=14)
+            ax2.set_ylabel(r'$\mathrm{best\>fit\>slope}$', fontsize=14)
         
-        # dummy plot to get error bars in legend exaxctly once
-        xlim = ax.get_xlim()
-        ylim = ax.get_xlim()
-        ax.errorbar(-100, -100, xerr=1, y_std=1, fmt='none', capsize=10, ecolor='k', 
-                    label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>\mathrm{bin\>STD}$')
-        ax.errorbar(-100, -100, xerr=10, y_err=10, fmt='none', ecolor='k', elinewidth=6, alpha=0.2, 
-                    label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>\mathrm{bin\>SEM}$')
-        ax.plot(-100, -100, c='k', ms=3, label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$') 
-        
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
-        ax.legend(fontsize=12, loc='best')
-        
-        # colorbar
+        # colorbar 
         cmap = mpl.cm.viridis
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=min(vary_val), vmax=max(vary_val)))
         sm._A = []
-        cbar = plt.colorbar(sm)
-        
-        var_strs = {'zl':r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
-                    'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation$', 
-                    'rmin':r'$r_{\mathrm{fit,min}}$', 'rmax':r'$r_{\mathrm{fit,max}}$'}
-        cbar.set_label(var_strs[vary_var], fontsize=14)
-        plt.tight_layout() 
-        
+        cbar = plt.colorbar(sm, ax=[ax, ax2]) 
+        cbar.set_label(self.var_strs[vary_var], fontsize=14)
+
         # ----- save -----
         if(sfx is None):
-            f.savefig('{}/{}_profile_convergence.png'.format(self.out_dir, vary_var), dpi=300)
+            f.savefig('{}/{}_data_convergence.png'.format(self.out_dir, vary_var), dpi=300)
         else:
-            f.savefig('{}/{}_profile_convergence_{}.png'.format(self.out_dir, vary_var, sfx), dpi=300)
+            f.savefig('{}/{}_data_convergence_{}.png'.format(self.out_dir, vary_var, sfx), dpi=300)
 
 
 
@@ -873,14 +896,17 @@ class nfw_profile_fitter:
 if(__name__ == "__main__"):
    
     # turn to True to force overwrite pre-existing fits
-    overwrite = True
+    overwrite = False
     
     # run all convergence tests
     #fitter = nfw_profile_fitter(NFW_dir = '/projects/DarkUniverse_esp/jphollowed/profile_fitting_tests/convergence_tests/vary_rmax')
     
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, inputs='grid')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, bin_data=True, rbins=30, inputs='grid')
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_old/vary_rmax')
+    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+                     bin_data=True, rbins=30, inputs='grid')
+    fitter.plot_data_convergence(vary_var='rmax', rmin=0.2, rmax=None, bin_data=True, rbins=30, plot_gradient=True)
+    sys.exit()
+    
 
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax_zoom')
     fitter.fit_halos(rmax=[0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5], rmin=[0.2], 
