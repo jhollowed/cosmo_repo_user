@@ -44,7 +44,7 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6,
             results
     '''
 
-    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos_{}_nsrcs{}_lenspix{}".format(
+    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos_nsrcs{}_lenspix{}".format(
                              out_dir, zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix))
 
     print('\n\n=============== working on halo at {} ==============='.format(out_dir.split('/')[-1]))
@@ -99,17 +99,17 @@ if __name__ == '__main__':
 
     # default params
     zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix, out_dir, vis = \
-        0.2, 1.0, 20000, 6, None, 10000, 1024, './output', True
+        0.2, 1.0, 20000, 6, 6, 10000, 1024, './output', True
 
     # override default by argv
     if(len(sys.argv) > 1): zl = float(sys.argv[1])
     if(len(sys.argv) > 2): zs = float(sys.argv[2])
     if(len(sys.argv) > 3): N = int(sys.argv[3])
     if(len(sys.argv) > 4): rfrac = float(sys.argv[4])
-    if(len(sys.argv) > 8): rfrac_los = float(sys.argv[8])
-    if(len(sys.argv) > 5): nsrcs = float(sys.argv[5])
-    if(len(sys.argv) > 5): lenspix = float(sys.argv[5])
-    if(len(sys.argv) > 6): out_dir = sys.argv[6]
-    if(len(sys.argv) > 7): vis = bool(sys.argv[7])
+    if(len(sys.argv) > 5): rfrac_los = float(sys.argv[5])
+    if(len(sys.argv) > 6): nsrcs = int(sys.argv[6])
+    if(len(sys.argv) > 7): lenspix = int(sys.argv[7])
+    if(len(sys.argv) > 8): out_dir = sys.argv[8]
+    if(len(sys.argv) > 9): vis = bool(sys.argv[9])
 
-    make_halo(zl, zs, N, rfrac, rfraclos, nsrcs, lenspix, out_dir, vis)
+    make_halo(zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix, out_dir, vis)
