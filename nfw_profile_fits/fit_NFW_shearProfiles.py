@@ -73,23 +73,23 @@ class nfw_profile_fitter:
         zlpl_dirs = np.array(glob.glob('{}/halo*'.format(NFW_dir)))
         zl = np.array([float(d.split('/')[-1].split('zl')[-1].split('_')[0]) for d in zlpl_dirs])
         zs = np.array([float(d.split('/')[-1].split('zs')[-1].split('_')[0]) for d in zlpl_dirs])
-        N = np.array([float(d.split('/')[-1].split('N')[-1].split('_')[0]) for d in zlpl_dirs])
+        N = np.array([int(d.split('/')[-1].split('N')[-1].split('_')[0]) for d in zlpl_dirs])
         rfrac = np.array([float(d.split('/')[-1].split('r200c')[0].split('_')[-1]) for d in zlpl_dirs])
         rfrac_los = np.array([float(d.split('/')[-1].split('r200clos')[0].split('_')[-1]) for d in zlpl_dirs])
-        lenspix = np.array([float(d.split('/')[-1].split('lensgrid')[0].split('_')[-1]) for d in zlpl_dirs])
-        nsrcs = np.array([float(d.split('/')[-1].split('nsrcs')[0].split('_')[-1]) for d in zlpl_dirs])
+        nsrcs = np.array([int(d.split('/')[-1].split('nsrcs')[-1].split('_')[0]) for d in zlpl_dirs])
+        lenspix = np.array([int(d.split('/')[-1].split('lenspix')[-1].split('_')[0]) for d in zlpl_dirs])
         print('Found {} lenses'.format(len(zl)))
         
         sort = np.argsort(zl)
         self.zlpl_dirs, self.zl, self.zs, self.N, self.rfrac, self.rfrac_los, self.nsrcs, self.lenspix = \
-            zlpl_dirs[sort], zl[sort], zs[sort], N[sort], rfrac[sort], rfrac_los[sort], lenspix[sort]
+            zlpl_dirs[sort], zl[sort], zs[sort], N[sort], rfrac[sort], rfrac_los[sort], nsrcs[sort], lenspix[sort]
         self.out_dir = '{}/profile_fits'.format(NFW_dir)
         
         self.var_strs = {'zl':r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
                          'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation$', 
                          'rmin':r'$r_{\mathrm{fit,min}}$', 'rmax':r'$r_{\mathrm{fit,max}}$',
-                         'losclip':r'$\Delta z_\mathrm{clip}$', 'nsrcs':r'$N\>\mathrm{sources}$',
-                         }
+                         'losClip':r'$\Delta z_\mathrm{clip}$', 'nsrcs':r'$N\>\mathrm{sources}$',
+                         'lenspix':r'$\sqrt{N_\mathrm{lensmap\>pixels}}$'}
 
     
     # ------------------------------------------------------------------------------------------------------------
@@ -144,8 +144,9 @@ class nfw_profile_fitter:
 
         # loop over all halos in input dir
         for i in range(len(self.zl)):
-            print('\nreading lensing mock data for lens zl={}, zs={}, N={}, rfrac={}, rfrac_los={}'.format(
-                    self.zl[i], self.zs[i], self.N[i], self.rfrac[i], self.rfrac_los[i]))
+            print('\nreading lensing mock data for lens zl={:.2f}, zs={:.2f}, N={}, rfrac={:.2f}, '\
+                  'rfrac_los={:.2f}, nsrcs={}, lenspix={}'.format( self.zl[i], self.zs[i], self.N[i], 
+                  self.rfrac[i], self.rfrac_los[i], self.nsrcs[i], self.lenspix[i]))
             
             # read lensing maps and get FOV size
             [sim_lens, true_profile] = self._read_nfw_shears(self.zlpl_dirs[i], inputs)
@@ -167,9 +168,10 @@ class nfw_profile_fitter:
                     this_rmin = true_profile.r200c * rmin[j]
                     assert this_rmin < this_rmax, "inner radial cut rmin cannot exceed outer radial cut rmax!"
                     
-                    output_suffix = 'zl{:.2f}_zs{:.2f}_N{}_fov{:.2f}_losClip{}_rmin{:.2f}_rmax{:.2f}_{}'.format(
-                                     self.zl[i], self.zs[i], self.N[i], self.rfrac[i], self.rfrac_los[i], 
-                                     this_rmin, this_rmax, inputs)
+                    output_suffix = 'zl{:.2f}_zs{:.2f}_N{}_fov{:.2f}_losClip{}_rmin{:.2f}_rmax{:.2f}_'\
+                                    'nsrcs{}_lenspix{}_{}'.format(self.zl[i], self.zs[i], self.N[i], 
+                                    self.rfrac[i], self.rfrac_los[i], this_rmin, this_rmax, self.nsrcs[i], 
+                                    self.lenspix[i], inputs)
                    
                     if(len(glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))) == 0 or overwrite):
                        
@@ -596,7 +598,7 @@ class nfw_profile_fitter:
         m_cm = np.array([pickle.load(open(f, 'rb')).radius_to_mass() for f in cmfit_out])
         truth_out = glob.glob('{}/true*.obj'.format(self.out_dir))
         m_true = np.array([pickle.load(open(f, 'rb')).radius_to_mass() for f in truth_out])
-       
+      
         vary_val_m = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
                                for f in fit_out])
         vary_val_cm = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
@@ -651,7 +653,6 @@ class nfw_profile_fitter:
         r200c = true_profile.r200c
         c = true_profile.c
         zl = true_profile.zl
-        dSigma_true = true_profile.delta_sigma(rsamp_full, bootstrap=False)
 
         # get profiles from fit results -- no bootstrap errors here
         fit_out = glob.glob('{}/fitted_profile*.obj'.format(self.out_dir))
@@ -686,7 +687,13 @@ class nfw_profile_fitter:
         
         for i in range(len(dSigma_fitted)):
             ax.loglog(rsamp_full/all_r200c[i], dSigma_fitted[i], color=colors[i], lw=2)
-        ax.loglog(rsamp_full/r200c, dSigma_true, '--', 
+        
+        # plot true profile
+        ax.set_xlim([0.2, 6])
+        ax.set_ylim([2, 300])
+        rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000)
+        dSigma_true = true_profile.delta_sigma(rsamp, bootstrap=False)
+        ax.loglog(rsamp/r200c, dSigma_true, '--', 
                   label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
                                                       .format(r200c, c), color='k', lw=2) 
 
@@ -788,7 +795,7 @@ class nfw_profile_fitter:
         # find and sort lenses by increasing vary_val
         sources_out = glob.glob('{}/source_data*.obj'.format(self.out_dir))
         lenses = np.array([pickle.load(open(f, 'rb')) for f in sources_out])        
-       
+      
         vary_val = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
                                for f in sources_out])
         sorter = np.argsort(vary_val)
@@ -819,6 +826,7 @@ class nfw_profile_fitter:
             k = bg['k']
             zs = bg['zs']
             if(bin_data):
+                print('binning data for lens {}/{}'.format(i+1, len(lenses)))
                 binned_data = lens.calc_delta_sigma_binned(nbins=rbins, return_edges=True, 
                                                      return_std=True, return_gradients=True)
                 delsig = binned_data['delta_sigma_mean']
@@ -901,10 +909,22 @@ if(__name__ == "__main__"):
     # run all convergence tests
     #fitter = nfw_profile_fitter(NFW_dir = '/projects/DarkUniverse_esp/jphollowed/profile_fitting_tests/convergence_tests/vary_rmax')
     
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_old/vary_rmax')
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_lenspix')
     fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
-    fitter.plot_data_convergence(vary_var='rmax', rmin=0.2, rmax=None, bin_data=True, rbins=30, plot_gradient=True)
+    #fitter.plot_mass_convergence(vary_var='lenspix')
+    #fitter.plot_profile_convergence(vary_var='lenspix')
+    #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
+    #                             rbins=30, plot_gradient=True)
+    
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_los')
+    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+                     bin_data=True, rbins=30, inputs='grid')
+    fitter.plot_mass_convergence(vary_var='losClip')
+    fitter.plot_profile_convergence(vary_var='losClip')
+    fitter.plot_data_convergence(vary_var='losClip', rmin=0.2, rmax=None, bin_data=True, 
+                                 rbins=30, plot_gradient=True)
+    
     sys.exit()
     
 
