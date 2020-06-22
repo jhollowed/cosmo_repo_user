@@ -780,7 +780,8 @@ class nfw_profile_fitter:
             Suffix to add to output figure filename (to prevent overwrites if testing convergence on different 
             ranges of one variable). Default is None.
         plot_gradient : bool, optional
-            Whether or not to render a second subplot which displays the gradient of each bin. Defaults to False.
+            Whether or not to render a second subplot which displays the gradient of each bin. Defaults to False, 
+            in which case the fractional bias of the data wrt to the true input profile is plotted.
         '''
         
         print('\n--------------- reading sources and plotting data convergence ---------------')
@@ -807,13 +808,10 @@ class nfw_profile_fitter:
         f = plt.figure(figsize=(6,6))
         data_lw = 0.85
         data_ms = 3
-        if(plot_gradient):
-            spec = gridspec.GridSpec(ncols=1, nrows=4, figure=f)
-            ax = f.add_subplot(spec[:-1,0])
-            ax2 = f.add_subplot(spec[-1,0])
-        else:
-            ax = f.add_subplot(111)
-        
+        spec = gridspec.GridSpec(ncols=1, nrows=4, figure=f)
+        ax = f.add_subplot(spec[:-2,0])
+        ax2 = f.add_subplot(spec[-2:,0])
+         
         # read data and plot for each lens
         for i in range(len(lenses)):
             
@@ -849,10 +847,21 @@ class nfw_profile_fitter:
             else:
                 ax.plot(r/r200c, delsig, 'x', c=colors[i], alpha=0.33, ms=data_ms)
         
-            # plot bin gradients
+            # plot bin gradients or biases
             if(plot_gradient):
                 grad = binned_data['bin_grad']
                 ax2.plot(r/r200c, grad, '-x', c=colors[i], lw=data_lw, ms=data_ms)
+            else:
+                delsig_true = true_profile.delta_sigma(r, bootstrap=False)
+                ax2.errorbar(r/r200c, delsig/delsig_true, 
+                            xerr=bin_widths/2/r200c, yerr=delsig_std/delsig_true, fmt='none', capsize=2, 
+                            ecolor=colors[i], elinewidth=data_lw, capthick=data_lw)
+                ax2.plot(r/r200c, delsig/delsig_true, '-o', c=colors[i], lw=data_lw, ms=data_ms)
+                ax2_xlim = ax2.get_xlim()
+                ax2_ylim = ax2.get_ylim()
+                ax2.plot(ax2_xlim, [1,1], '--k', lw=1)
+                ax2.set_xlim(ax2_xlim)
+                ax2.set_ylim(ax2_ylim)
          
         # dummy plot to get error bars in legend exaxctly once
         ax.errorbar(-100, -100, xerr=1, y_std=1, fmt='none', capsize=2, ecolor='k', elinewidth=data_lw,
@@ -867,19 +876,19 @@ class nfw_profile_fitter:
         rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000)
         dSigma_true = true_profile.delta_sigma(rsamp, bootstrap=False)
         ax.plot(rsamp/r200c, dSigma_true, '--', 
-                label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+                label=r'$\Delta\Sigma_\mathrm{{true}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
                                                       .format(r200c, c), color='k', lw=1.5) 
-        ax.set_xscale('log')
-        ax.set_yscale('log')
         
         # ----- format -----
+        ax.set_xscale('log')
+        ax.set_yscale('log')
         ax.set_xlabel(r'$r/R_{200c}$', fontsize=14)
         ax.set_ylabel(r'$\Delta\Sigma\>\>\lbrack\mathrm{M}_\odot\mathrm{pc}^{-2}\rbrack$', fontsize=14)
         ax.set_title(r'$z_\mathrm{{lens}} = {}$'.format(zl), fontsize=14)
         ax.legend(fontsize=8, loc='best')
-        if(plot_gradient):
-            ax2.set_xlabel(r'$r/R_{200c}$', fontsize=14)
-            ax2.set_ylabel(r'$\mathrm{best\>fit\>slope}$', fontsize=14)
+        ax2.set_xlabel(r'$r/R_{200c}$', fontsize=14)
+        if(plot_gradient): ax2.set_ylabel(r'$\mathrm{best\>fit\>slope}$', fontsize=14)
+        else: ax2.set_ylabel(r'$\Delta\Sigma/\Delta\Sigma_\mathrm{true}$', fontsize=14)
         
         # colorbar 
         cmap = mpl.cm.viridis
@@ -908,10 +917,17 @@ if(__name__ == "__main__"):
     
     # run all convergence tests
     #fitter = nfw_profile_fitter(NFW_dir = '/projects/DarkUniverse_esp/jphollowed/profile_fitting_tests/convergence_tests/vary_rmax')
+    #fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_sph')
+    #fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+    #                 bin_data=True, rbins=30, inputs='grid')
+    #fitter.plot_profile_convergence(vary_var='lenspix')
+    #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
+    #                             rbins=30, plot_gradient=False)
+    #sys.exit()
     
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_lenspix')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
-                     bin_data=True, rbins=30, inputs='grid')
+    #fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_lenspix')
+    #fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+    #                 bin_data=True, rbins=30, inputs='grid')
     #fitter.plot_mass_convergence(vary_var='lenspix')
     #fitter.plot_profile_convergence(vary_var='lenspix')
     #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
@@ -923,7 +939,7 @@ if(__name__ == "__main__"):
     fitter.plot_mass_convergence(vary_var='losClip')
     fitter.plot_profile_convergence(vary_var='losClip')
     fitter.plot_data_convergence(vary_var='losClip', rmin=0.2, rmax=None, bin_data=True, 
-                                 rbins=30, plot_gradient=True)
+                                 rbins=30, plot_gradient=False)
     
     sys.exit()
     
