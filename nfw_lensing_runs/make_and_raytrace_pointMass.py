@@ -1,11 +1,10 @@
 import os
 import sys
 import pdb
-sys.path.append('/home/hollowed/repos/mpwl-raytrace/NFW_test_cases') # cooley
-sys.path.append('/Users/joe/repos/mpwl-raytrace/NFW_test_cases') # miniroomba
-from make_simple_halo import NFW
-from make_simple_halo import PointMass
-from raytrace_simple_halo import raytracer
+sys.path.append('/home/hollowed/repos/mpwl-raytrace/test_cases') # cooley
+sys.path.append('/Users/joe/repos/mpwl-raytrace/test_cases') # miniroomba
+from make_simple_lens import PointMass
+from raytrace_simple_lens import raytracer
 
 
 # ======================================================================================================
@@ -39,14 +38,13 @@ def make_pointmass(zl=0.3, zs=1.0, fov_size=1, nsrcs=10000, lenspix=1024, vis=Fa
         which density estimator to use; either 'dtfe' or 'sph'
     '''
 
-    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos_nsrcs{}_lenspix{}".format(
-                             out_dir, zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix))
+    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_fov{:.2f}_nsrcs{}_lenspix{}".format(
+                             out_dir, zl, zs, fov_size, nsrcs, lenspix))
 
     print('\n\n=============== working on halo at {} ==============='.format(out_dir.split('/')[-1]))
     print('Placing point mass and writing out')
-    pointmass = PointMass(m=1e14, z=zl)
+    pointmass = PointMass(M=1e14, z=zl)
     pointmass.output_particles(fov_size, output_dir=out_dir)
-    halo.output_particles(output_dir = out_dir, vis_debug=vis)
     
     raytrace_lens(out_dir, zs=[zs], vis=vis, nsrcs=nsrcs, lenspix=lenspix, density_estimator=density_estimator)
 
@@ -104,11 +102,11 @@ if __name__ == '__main__':
     # override default by argv
     if(len(sys.argv) > 1): zl = float(sys.argv[1])
     if(len(sys.argv) > 2): zs = float(sys.argv[2])
-    if(len(sys.argv) > 3): fov_size = float(sys.argv[4])
-    if(len(sys.argv) > 4): nsrcs = int(sys.argv[6])
-    if(len(sys.argv) > 5): lenspix = int(sys.argv[7])
-    if(len(sys.argv) > 6): out_dir = sys.argv[8]
-    if(len(sys.argv) > 7): vis = bool(int(sys.argv[9]))
-    if(len(sys.argv) > 8): de = sys.argv[10]
+    if(len(sys.argv) > 3): fov_size = float(sys.argv[3])
+    if(len(sys.argv) > 4): nsrcs = int(sys.argv[4])
+    if(len(sys.argv) > 5): lenspix = int(sys.argv[5])
+    if(len(sys.argv) > 6): out_dir = sys.argv[6]
+    if(len(sys.argv) > 7): vis = bool(int(sys.argv[7]))
+    if(len(sys.argv) > 8): de = sys.argv[8]
 
     make_pointmass(zl, zs, fov_size, nsrcs, lenspix, vis, out_dir, de)
