@@ -11,7 +11,7 @@ from raytrace_simple_halo import raytracer
 
 
 def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6, 
-              nsrcs=10000, lenspix=1024, vis=False, out_dir='./output', 
+              nsrcs=10000, lenspix=1024, out_dir='./output', vis=False,
               density_estimator='dtfe', seed=606):
     '''
     Generate an NFW particle distribution and place it at a redshift z via the methods in mpwl_raytrace
@@ -34,12 +34,12 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6,
     lenspix : int
         Number of pixels on one side of the grid on which to compute density and lensing quantities
         (total number of pixels is lenspix^2)
-    vis : bool, optional
-        flag to send to make_simple_halo to generate a figure of the NFW particles or not
     out_dir : str, optinal
         location for output, does not have to exist; defaults to "./output/" where "." is the current
         working directory. Within this location, a directory will be created as 
         "halo_z{:.2f}_N{}_{:.2f}r200c".format(z, N, rfrac)
+    vis : bool, optional
+        flag to send to make_simple_halo to generate a figure of the NFW particles or not
     density_estimator : string, optional
         which density estimator to use; either 'dtfe' or 'sph'
     seed : float, optional
@@ -123,4 +123,4 @@ if __name__ == '__main__':
     if(len(sys.argv) > 9): vis = bool(int(sys.argv[9]))
     if(len(sys.argv) > 10): de = sys.argv[10]
 
-    make_halo(zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix, vis, out_dir, de)
+    make_halo(zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix, out_dir, vis, de)
