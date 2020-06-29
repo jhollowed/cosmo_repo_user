@@ -229,7 +229,8 @@ class nfw_profile_fitter:
         zl = props['halo_redshift']
         r200c = props['sod_halo_radius']
         c = props['sod_halo_cdelta']
-        c_err = props['sod_halo_cdelta_error']
+        #c_err = props['sod_halo_cdelta_error']
+        c_err = 0
         m200c = props['sod_halo_mass']
         true_profile = NFW(r200c, c, zl, c_err = c_err, cosmo=cosmo)
  
@@ -691,7 +692,7 @@ class nfw_profile_fitter:
         # plot true profile
         ax.set_xlim([0.2, 6])
         ax.set_ylim([2, 300])
-        rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000)
+        rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000) * r200c
         dSigma_true = true_profile.delta_sigma(rsamp, bootstrap=False)
         ax.loglog(rsamp/r200c, dSigma_true, '--', 
                   label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
@@ -873,7 +874,7 @@ class nfw_profile_fitter:
         # plot true profile
         ax.set_xlim([0.2, 6])
         ax.set_ylim([2, 300])
-        rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000)
+        rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000) * r200c
         dSigma_true = true_profile.delta_sigma(rsamp, bootstrap=False)
         ax.plot(rsamp/r200c, dSigma_true, '--', 
                 label=r'$\Delta\Sigma_\mathrm{{true}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
@@ -932,6 +933,15 @@ if(__name__ == "__main__"):
     #fitter.plot_profile_convergence(vary_var='lenspix')
     #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
     #                             rbins=30, plot_gradient=True)
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
+    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+                     bin_data=True, rbins=30, inputs='grid')
+    fitter.plot_mass_convergence(vary_var='zl')
+    fitter.plot_profile_convergence(vary_var='zl')
+    fitter.plot_data_convergence(vary_var='zl', rmin=0.2, rmax=None, bin_data=True, 
+                                 rbins=30, plot_gradient=False)
+    
+    sys.exit()
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_los')
     fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
