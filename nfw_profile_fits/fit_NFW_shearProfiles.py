@@ -933,6 +933,16 @@ if(__name__ == "__main__"):
     #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
     #                             rbins=30, plot_gradient=True)
     
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
+    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+                     bin_data=True, rbins=30, inputs='grid')
+    fitter.plot_mass_convergence(vary_var='zl')
+    fitter.plot_profile_convergence(vary_var='zl')
+    fitter.plot_data_convergence(vary_var='zl', rmin=0.2, rmax=None, bin_data=True, 
+                                 rbins=30, plot_gradient=False)
+    
+    sys.exit()
+    
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_los')
     fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
@@ -941,9 +951,6 @@ if(__name__ == "__main__"):
     fitter.plot_data_convergence(vary_var='losClip', rmin=0.2, rmax=None, bin_data=True, 
                                  rbins=30, plot_gradient=False)
     
-    sys.exit()
-    
-
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax_zoom')
     fitter.fit_halos(rmax=[0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5], rmin=[0.2], 
                      single_halo_plots=False, overwrite=overwrite)
@@ -962,12 +969,10 @@ if(__name__ == "__main__"):
     fitter.plot_mass_convergence(vary_var='N')
     fitter.plot_profile_convergence(vary_var='N')
     
-    
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
     fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=False, overwrite=overwrite)
     fitter.plot_mass_convergence(vary_var='zl')
     fitter.plot_profile_convergence(vary_var='zl')
-    
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zs')
     fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=False, overwrite=overwrite)
