@@ -2,6 +2,7 @@ import os
 import sys
 import pdb
 import numpy as np
+import astropy.units as u
 
 sys.path.append('/home/hollowed/repos/mpwl-raytrace/test_cases') # cooley
 sys.path.append('/home/hollowed/repos/mpwl-raytrace/') # cooley
@@ -60,16 +61,19 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6,
     print('Populating halo with particles')
     
     # set radius such that m200c = 1e14 at z=0, and concentration from child c-M relation at z=0
+    # verified with halotools
     m200c = 1e14
     c = 4.37
-    rho = cosmo.critical_density(0)
+    rho = cm.rho_crit_z0().value
     r200c = (3*m200c/(4*np.pi*rho*200))**(1/3)
 
     halo = NFW(r200c=r200c, c=c, z=zl, seed=seed)
     halo.populate_halo(N=N, rfrac=rfrac, rfrac_los=rfrac_los)
+    
     print('writing out')
     halo.output_particles(output_dir = out_dir, vis_debug=vis)
     
+    print('starting raytrace')
     raytrace_lens(out_dir, zs=[zs], vis=vis, nsrcs=nsrcs, lenspix=lenspix, density_estimator=density_estimator)
 
 
