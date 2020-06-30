@@ -2,9 +2,12 @@ import os
 import sys
 import pdb
 sys.path.append('/home/hollowed/repos/mpwl-raytrace/test_cases') # cooley
+sys.path.append('/home/hollowed/repos/mpwl-raytrace/') # cooley
 sys.path.append('/Users/joe/repos/mpwl-raytrace/test_cases') # miniroomba
+sys.path.append('/Users/joe/repos/mpwl-raytrace/') # miniroomba
 from make_simple_lens import NFW
 from raytrace_simple_lens import raytracer
+import cosmology as cm
 
 
 # ======================================================================================================
@@ -12,7 +15,7 @@ from raytrace_simple_lens import raytracer
 
 def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6, 
               nsrcs=10000, lenspix=1024, out_dir='./output', vis=False,
-              density_estimator='dtfe', seed=606):
+              density_estimator='dtfe', seed=606, cosmo=cm.OuterRim_params):
     '''
     Generate an NFW particle distribution and place it at a redshift z via the methods in mpwl_raytrace
 
@@ -53,7 +56,14 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6,
 
     print('\n\n=============== working on halo at {} ==============='.format(out_dir.split('/')[-1]))
     print('Populating halo with particles')
-    halo = NFW(m200c = 1e14, z=zl, seed=seed)
+    
+    # set radius such that m200c = 1e14 at z=0, and concentration from child c-M relation at z=0
+    m200c = 1e14
+    c = 4.37
+    rho = cm.critical_density(0)
+    r200c = (3*m200c/(4*np.pi*rho*200))**(1/3)
+
+    halo = NFW(r200c=r200c, c=c, z=zl, seed=seed)
     halo.populate_halo(N=N, rfrac=rfrac, rfrac_los=rfrac_los)
     print('writing out')
     halo.output_particles(output_dir = out_dir, vis_debug=vis)
