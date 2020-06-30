@@ -109,10 +109,9 @@ class nfw_profile_fitter:
             set to the full radial extent of the FOV as given in the NFW input. This default will also be imposed if
             the input rmax is greater than the size of the FOV. If an array is provided, the entire fitting procedure
             will be done per array entry, varying the rmax "hyperparameter" 
-        rmin : float array, optional
+        rmin : float, optional
             The minimum radial distance of sources to include in the fit in units of r200c (e.g. rmin = 0.3 will
-            remove the inner 300kpc/h of source information). Defaults to 0. If an array is provided, the entire 
-            fitting procedure will be done per array entry, varying the rmin "hyperparameter" 
+            remove the inner 300kpc/h of source information). Defaults to 0.
         bin_data : bool, optional
             whether or not to fit to shears averaged in radial bins, rather than to each individual source.
             Defaults to False.
@@ -157,39 +156,33 @@ class nfw_profile_fitter:
             props = np.genfromtxt(props_file, delimiter=',', names=True)
             fov_edge = props['boxRadius_Mpc']
             
-            # loop over all chocies of rmin, rmax
+            # loop over all chocies of rmax, record scaled ranges to self.rmax, self.rmin attributes
+            self.rmin = true_profile.r200c * rmin
             self.rmax = np.zeros(len(rmax))
-            self.rmin = np.zeros(len(rmin))
-            for j in range(len(rmin)):
-                for k in range(len(rmax)):
-                    
-                    # scale rmin, rmax to Mpc
-                    if(rmax[k] is None): this_rmax = fov_edge
-                    elif(rmax[k] > fov_edge): this_rmax = fov_edge
-                    else: this_rmax = true_profile.r200c * rmax[k]
-                    this_rmin = true_profile.r200c * rmin[j]
-                    assert this_rmin < this_rmax, "inner radial cut rmin cannot exceed outer radial cut rmax!"
-                    
-                    self.rmax[k] = this_rmax
-                    self.rmin[j] = this_rmin
-                    
-                    output_suffix = 'zl{:.2f}_zs{:.2f}_N{}_fov{:.2f}_losClip{}_rmin{:.2f}_rmax{:.2f}_'\
-                                    'nsrcs{}_lenspix{}_{}'.format(self.zl[i], self.zs[i], self.N[i], 
-                                    self.rfrac[i], self.rfrac_los[i], this_rmin, this_rmax, self.nsrcs[i], 
-                                    self.lenspix[i], inputs)
+            
+            for k in range(len(rmax)): 
+                # scale rmin, rmax to Mpc
+                if(rmax[k] is None or rmax[k] > fov_edge): this_rmax = fov_edge
+                else: this_rmax = true_profile.r200c * rmax[k]
+                assert self.rmin < this_rmax, "inner radial cut rmin ({}) cannot exceed outer radial cut rmax ({})!".format(self.rmin, this_rmax)
+                
+                output_suffix = 'zl{:.2f}_zs{:.2f}_N{}_fov{:.2f}_losClip{}_rmin{:.2f}_rmax{:.2f}_'\
+                                'nsrcs{}_lenspix{}_{}'.format(self.zl[i], self.zs[i], self.N[i], 
+                                self.rfrac[i], self.rfrac_los[i], this_rmin, this_rmax, self.nsrcs[i], 
+                                self.lenspix[i], inputs)
+               
+                if(len(glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))) == 0 or overwrite):
                    
-                    if(len(glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))) == 0 or overwrite):
-                       
-                        if not os.path.exists(self.out_dir): os.makedirs(self.out_dir)
-                        else: [os.remove(obj) for obj in glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))]
+                    if not os.path.exists(self.out_dir): os.makedirs(self.out_dir)
+                    else: [os.remove(obj) for obj in glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))]
 
-                        print('------------ fitting in radial range [{:.2f}, {:.2f}] Mpc ------------'.format(
-                                                                                          this_rmin, this_rmax))
-                        self._fit_nfw(sim_lens, true_profile, rmin=this_rmin, rmax=this_rmax,
-                                      make_plot=single_halo_plots, bin_data=bin_data, rbins=rbins, 
-                                      bootstrap=bootstrap, sfx=output_suffix, grid_scan=grid_scan, grid_N=grid_N)    
-                    else:
-                        print('fitting files already exist for {}; skipping'.format(output_suffix))
+                    print('------------ fitting in radial range [{:.2f}, {:.2f}] Mpc ------------'.format(
+                                                                                      this_rmin, this_rmax))
+                    self._fit_nfw(sim_lens, true_profile, rmin=this_rmin, rmax=this_rmax,
+                                  make_plot=single_halo_plots, bin_data=bin_data, rbins=rbins, 
+                                  bootstrap=bootstrap, sfx=output_suffix, grid_scan=grid_scan, grid_N=grid_N)    
+                else:
+                    print('fitting files already exist for {}; skipping'.format(output_suffix))
         
     
     # ------------------------------------------------------------------------------------------------------------
@@ -774,8 +767,7 @@ class nfw_profile_fitter:
         rmax : float
             The maximum radial distance of sources to include in the plot in Mpc (e.g. rmin = 2.0 will
             trim the source popiulation beyond 2*r200c. Defaults to None, in which case rmax will automatically be 
-            set to the full radial extent of the FOV as given in the NFW input. This default will also be imposed if
-            the input rmax is greater than the size of the FOV.
+            set to the full radial extent of the FOV as given in the NFW input.
         bin_data : bool
             whether or not to fits were done with shears averaged in radial bins, rather than to each individual 
             source.Defaults to False.
@@ -861,8 +853,6 @@ class nfw_profile_fitter:
             # plot true profile
             dSigma_true = true_profile.delta_sigma(r, bootstrap=False)
             ax.plot(r/r200c, dSigma_true, '--', color=colors[i])
-                    #label=r'$\Delta\Sigma_\mathrm{{true}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
-                                                      #.format(r200c, c), color='k', lw=1.5) 
  
             # plot bin gradients or biases
             if(plot_gradient):
@@ -886,8 +876,7 @@ class nfw_profile_fitter:
                     label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>y:\mathrm{std},\>x:\mathrm{bin\>width},$')
         ax.errorbar(-100, -100, xerr=10, y_err=10, fmt='none', ecolor='k', elinewidth=6, alpha=0.2, 
                     label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>\mathrm{bin\>sem}$')
-        ax.plot(-100, -100, '-ok', label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$', lw=data_lw, ms=data_ms) 
-        
+        ax.plot(-100, -100, '-ok', label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$', lw=data_lw, ms=data_ms)         
         
         # ----- format -----
         ax.set_xscale('log')
