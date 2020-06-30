@@ -158,6 +158,8 @@ class nfw_profile_fitter:
             fov_edge = props['boxRadius_Mpc']
             
             # loop over all chocies of rmin, rmax
+            self.rmax = np.zeros(len(rmax))
+            self.rmin = np.zeros(len(rmin))
             for j in range(len(rmin)):
                 for k in range(len(rmax)):
                     
@@ -167,6 +169,9 @@ class nfw_profile_fitter:
                     else: this_rmax = true_profile.r200c * rmax[k]
                     this_rmin = true_profile.r200c * rmin[j]
                     assert this_rmin < this_rmax, "inner radial cut rmin cannot exceed outer radial cut rmax!"
+                    
+                    self.rmax[k] = this_rmax
+                    self.rmin[j] = this_rmin
                     
                     output_suffix = 'zl{:.2f}_zs{:.2f}_N{}_fov{:.2f}_losClip{}_rmin{:.2f}_rmax{:.2f}_'\
                                     'nsrcs{}_lenspix{}_{}'.format(self.zl[i], self.zs[i], self.N[i], 
@@ -182,7 +187,7 @@ class nfw_profile_fitter:
                                                                                           this_rmin, this_rmax))
                         self._fit_nfw(sim_lens, true_profile, rmin=this_rmin, rmax=this_rmax,
                                       make_plot=single_halo_plots, bin_data=bin_data, rbins=rbins, 
-                                      bootstrap=bootstrap, sfx=output_suffix, grid_scan=grid_scan, grid_N=grid_N) 
+                                      bootstrap=bootstrap, sfx=output_suffix, grid_scan=grid_scan, grid_N=grid_N)    
                     else:
                         print('fitting files already exist for {}; skipping'.format(output_suffix))
         
@@ -788,16 +793,16 @@ class nfw_profile_fitter:
         print('\n--------------- reading sources and plotting data convergence ---------------')
         
         # get true halo profile
-        truth_out = glob.glob('{}/true*.obj'.format(self.out_dir))[0]
-        true_profile = pickle.load(open(truth_out, 'rb'))
-        r200c = true_profile.r200c
-        c = true_profile.c
-        zl = true_profile.zl
+        truth_out = glob.glob('{}/true*.obj'.format(self.out_dir))
+        true_profiles = np.array([pickle.load(open(f, 'rb')) for f in truth_out])
+        vary_val = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
+                               for f in truth_out])
+        sorter = np.argsort(vary_val)
+        true_profiles = true_profiles[sorter]
 
         # find and sort lenses by increasing vary_val
         sources_out = glob.glob('{}/source_data*.obj'.format(self.out_dir))
         lenses = np.array([pickle.load(open(f, 'rb')) for f in sources_out])        
-      
         vary_val = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
                                for f in sources_out])
         sorter = np.argsort(vary_val)
@@ -817,6 +822,11 @@ class nfw_profile_fitter:
         for i in range(len(lenses)):
             
             # ----- read -----
+            true_profile = true_profiles[i]
+            r200c = true_profile.r200c
+            c = true_profile.c
+            zl = true_profile.zl
+            
             lens = lenses[i]
             lens.set_radial_cuts(rmin, rmax)
             bg = lens.get_background()
@@ -847,7 +857,13 @@ class nfw_profile_fitter:
                 ax.plot(r/r200c, delsig, '-o', c=colors[i], lw=data_lw, ms=data_ms) 
             else:
                 ax.plot(r/r200c, delsig, 'x', c=colors[i], alpha=0.33, ms=data_ms)
-        
+            
+            # plot true profile
+            dSigma_true = true_profile.delta_sigma(r, bootstrap=False)
+            ax.plot(r/r200c, dSigma_true, '--', color=colors[i])
+                    #label=r'$\Delta\Sigma_\mathrm{{true}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+                                                      #.format(r200c, c), color='k', lw=1.5) 
+ 
             # plot bin gradients or biases
             if(plot_gradient):
                 grad = binned_data['bin_grad']
@@ -865,20 +881,13 @@ class nfw_profile_fitter:
                 ax2.set_ylim(ax2_ylim)
          
         # dummy plot to get error bars in legend exaxctly once
+        ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$')
         ax.errorbar(-100, -100, xerr=1, y_std=1, fmt='none', capsize=2, ecolor='k', elinewidth=data_lw,
                     label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>y:\mathrm{std},\>x:\mathrm{bin\>width},$')
         ax.errorbar(-100, -100, xerr=10, y_err=10, fmt='none', ecolor='k', elinewidth=6, alpha=0.2, 
                     label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>\mathrm{bin\>sem}$')
         ax.plot(-100, -100, '-ok', label=r'$\gamma_{\mathrm{NFW}}\Sigma_c$', lw=data_lw, ms=data_ms) 
         
-        # plot true profile
-        ax.set_xlim([0.2, 6])
-        ax.set_ylim([2, 300])
-        rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000) * r200c
-        dSigma_true = true_profile.delta_sigma(rsamp, bootstrap=False)
-        ax.plot(rsamp/r200c, dSigma_true, '--', 
-                label=r'$\Delta\Sigma_\mathrm{{true}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
-                                                      .format(r200c, c), color='k', lw=1.5) 
         
         # ----- format -----
         ax.set_xscale('log')
@@ -933,7 +942,7 @@ if(__name__ == "__main__"):
     #fitter.plot_profile_convergence(vary_var='lenspix')
     #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
     #                             rbins=30, plot_gradient=True)
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_new/vary_zl')
     fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
     fitter.plot_mass_convergence(vary_var='zl')

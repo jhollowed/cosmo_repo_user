@@ -1,8 +1,8 @@
 import os
 import sys
 import pdb
-sys.path.append('/home/hollowed/repos/mpwl-raytrace/NFW_test_cases') # cooley
-sys.path.append('/Users/joe/repos/mpwl-raytrace/NFW_test_cases') # miniroomba
+sys.path.append('/home/hollowed/repos/mpwl-raytrace/test_cases') # cooley
+sys.path.append('/Users/joe/repos/mpwl-raytrace/test_cases') # miniroomba
 from make_simple_lens import NFW
 from raytrace_simple_lens import raytracer
 
