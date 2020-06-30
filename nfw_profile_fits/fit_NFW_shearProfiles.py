@@ -142,7 +142,7 @@ class nfw_profile_fitter:
         """
 
         # loop over all halos in input dir
-        for i in range(len(self.zl)):
+        for i in range(len(self.zlpl_dirs)):
             print('\nreading lensing mock data for lens zl={:.2f}, zs={:.2f}, N={}, rfrac={:.2f}, '\
                   'rfrac_los={:.2f}, nsrcs={}, lenspix={}'.format( self.zl[i], self.zs[i], self.N[i], 
                   self.rfrac[i], self.rfrac_los[i], self.nsrcs[i], self.lenspix[i]))
@@ -168,7 +168,7 @@ class nfw_profile_fitter:
                 
                 output_suffix = 'zl{:.2f}_zs{:.2f}_N{}_fov{:.2f}_losClip{}_rmin{:.2f}_rmax{:.2f}_'\
                                 'nsrcs{}_lenspix{}_{}'.format(self.zl[i], self.zs[i], self.N[i], 
-                                self.rfrac[i], self.rfrac_los[i], this_rmin, this_rmax, self.nsrcs[i], 
+                                self.rfrac[i], self.rfrac_los[i], self.rmin, this_rmax, self.nsrcs[i], 
                                 self.lenspix[i], inputs)
                
                 if(len(glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))) == 0 or overwrite):
@@ -177,8 +177,8 @@ class nfw_profile_fitter:
                     else: [os.remove(obj) for obj in glob.glob('{}/*{}.obj'.format(self.out_dir, output_suffix))]
 
                     print('------------ fitting in radial range [{:.2f}, {:.2f}] Mpc ------------'.format(
-                                                                                      this_rmin, this_rmax))
-                    self._fit_nfw(sim_lens, true_profile, rmin=this_rmin, rmax=this_rmax,
+                                                                                      self.rmin, this_rmax))
+                    self._fit_nfw(sim_lens, true_profile, rmin=self.rmin, rmax=this_rmax,
                                   make_plot=single_halo_plots, bin_data=bin_data, rbins=rbins, 
                                   bootstrap=bootstrap, sfx=output_suffix, grid_scan=grid_scan, grid_N=grid_N)    
                 else:
@@ -227,7 +227,8 @@ class nfw_profile_fitter:
         zl = props['halo_redshift']
         r200c = props['sod_halo_radius']
         c = props['sod_halo_cdelta']
-        c_err = props['sod_halo_cdelta_error']
+        #c_err = props['sod_halo_cdelta_error']
+        c_err = 0
         m200c = props['sod_halo_mass']
         true_profile = NFW(r200c, c, zl, c_err = c_err, cosmo=cosmo)
  
@@ -653,7 +654,6 @@ class nfw_profile_fitter:
         sorter = np.argsort(vary_val)
         true_profiles = true_profiles[sorter]
         
-        true_profile = true_profiles[i]
         r200c = [t.r200c for t in true_profiles]
         c = [t.c for t in true_profiles]
         zl = [t.zl for t in true_profiles]
@@ -690,9 +690,9 @@ class nfw_profile_fitter:
         colors = plt.cm.viridis(np.linspace(0, 1, len(dSigma_fitted)))
         
         for i in range(len(dSigma_fitted)):
-            ax.loglog(rsamp_full/all_r200c[i], dSigma_fitted[i], color=colors[i], lw=2)
-            # dummy plot for legend
-            ax.plot([-100, -101], [-100, -101], color='k', label=r'$\Delta\Sigma_\mathrm{{fits}}$')
+            ax.loglog(rsamp[i]/all_r200c[i], dSigma_fitted[i], color=colors[i], lw=2)
+        # dummy plot for legend
+        ax.plot([-100, -101], [-100, -101], color='k', label=r'$\Delta\Sigma_\mathrm{{fits}}$')
         
         # plot true profile (single black plot if halo params are constant across inputs, colored by vary_val if not)
         if(len(np.unique(r200c)) == 1 and len(np.unique(c)) == 1):
@@ -703,10 +703,10 @@ class nfw_profile_fitter:
                                                           .format(r200c[0], c[0]), color='k', lw=2)
         else:
             for i in range(len(true_profiles)):
-                dSigma_true = true_profiles[i].delta_sigma(rsamp, bootstrap=False)
-                ax.loglog(rsamp/r200c[i], dSigma_true, '--', color=colors[i]) 
-                # dummy for legend
-                ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$') 
+                dSigma_true = true_profiles[i].delta_sigma(rsamp[i], bootstrap=False)
+                ax.loglog(rsamp[i]/r200c[i], dSigma_true, '--', color=colors[i]) 
+            # dummy for legend
+            ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$') 
 
         # format
         ax.legend(fontsize=12, loc='best')
@@ -717,17 +717,26 @@ class nfw_profile_fitter:
 
         # plot convergence in the radius-concentration plane
         ax2 = f.add_subplot(122)
-        ax2.plot([r200c], [c], 'xk', ms=10, label=r'$\mathrm{{truth}}$')
+        grid_r = np.linspace(0.6, 1.2, 100)
+        grid_c = np.linspace(3, 6, 100)
        
         ax2.plot(all_r200c, all_c, '-k', lw=0.5)
         for i in range(len(all_c)):
             ax2.errorbar(all_r200c[i], all_c[i], xerr=all_r200c_err[i], yerr=all_c_err[i], 
                          ms=10, marker='.', c=colors[i])
+        # dummy for legend
+        ax2.plot([-100], [-100], '.k', ms=10, label=r'$\mathrm{{fit}}$')
+        
+        if(len(np.unique(r200c)) != 1 and len(np.unique(c)) != 1):
+            for i in range(len(r200c)):
+                ax2.plot([r200c[i]], [c[i]], 'x', c=colors[i], ms=10)
+            # dummy for legend
+            ax2.plot([-100], [-100], 'xk', ms=10, label=r'$\mathrm{{truth}}$')
+        else:
+            ax2.plot([r200c[0]], [c[0]], 'xk', ms=10, label=r'$\mathrm{{truth}}$')
 
         # include c-M relation curve (if redshift of lens is fixed)
         if(len(np.unique(zl)) == 0):
-            grid_r = np.linspace(0.6, 1.2, 100)
-            grid_c = np.linspace(3, 6, 100)
             tmp_profile = NFW(1,1,zl[0])
             tmp_m200c = np.zeros(len(grid_r))
             for i in range(len(tmp_m200c)):
@@ -805,9 +814,9 @@ class nfw_profile_fitter:
                                for f in truth_out])
         sorter = np.argsort(vary_val)
         true_profiles = true_profiles[sorter]
-        r200c = [t.r200c for t in true_profiles]
-        c = [t.c for t in true_profiles]
-        zl = [t.zl for t in true_profiles]
+        r200c = [float(t.r200c) for t in true_profiles]
+        c = [float(t.c) for t in true_profiles]
+        zl = [float(t.zl) for t in true_profiles]
 
         # find and sort lenses by increasing vary_val
         sources_out = glob.glob('{}/source_data*.obj'.format(self.out_dir))
@@ -856,38 +865,30 @@ class nfw_profile_fitter:
                 r_std = binned_data['r_std']
                 r_err = binned_data['r_se_mean']
                 bin_widths = np.diff(binned_data['bin_edges'])
-                ax.errorbar(r/r200c, delsig, xerr=bin_widths/2/r200c, yerr=delsig_std, fmt='none', capsize=2, 
+                ax.errorbar(r/r200c[i], delsig, xerr=bin_widths/2/r200c[i], yerr=delsig_std, fmt='none', capsize=2, 
                             ecolor=colors[i], elinewidth=data_lw, capthick=data_lw)
-                ax.errorbar(r/r200c, delsig, xerr=r_err/r200c, yerr=delsig_err, fmt='none', ecolor=colors[i],
+                ax.errorbar(r/r200c[i], delsig, xerr=r_err/r200c[i], yerr=delsig_err, fmt='none', ecolor=colors[i],
                             elinewidth=6, alpha=0.2)
-                ax.plot(r/r200c, delsig, '-o', c=colors[i], lw=data_lw, ms=data_ms) 
+                ax.plot(r/r200c[i], delsig, '-o', c=colors[i], lw=data_lw, ms=data_ms) 
             else:
-                ax.plot(r/r200c, delsig, 'x', c=colors[i], alpha=0.33, ms=data_ms)
+                ax.plot(r/r200c[i], delsig, 'x', c=colors[i], alpha=0.33, ms=data_ms)
             
             # plot true profile for this vary_val if profile parameters are not unique across inputs
             # (else plot single line below)
-            if(len(np.unique(r200c)) == 1 and len(np.unique(c)) == 1):
-                dSigma_true = true_profileis[0].delta_sigma(r, bootstrap=False)
-                ax.loglog(r/r200c[0], dSigma_true, '--', 
-                          label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
-                                                              .format(r200c[0], c[0]), color='k', lw=2) 
-            else:
-                for i in range(len(true_profiles)):
-                    dSigma_true = true_profiles[i].delta_sigma(rsamp, bootstrap=False)
-                    ax.loglog(rsamp/r200c[i], dSigma_true, '--', color=colors[i]) 
-                # dummy for legend
-                ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$') 
+            if(len(np.unique(r200c)) != 1 and len(np.unique(c)) != 1):
+                dSigma_true = true_profile.delta_sigma(r, bootstrap=False)
+                ax.loglog(r/r200c[i], dSigma_true, '--', color=colors[i]) 
  
             # plot bin gradients or biases
             if(plot_gradient):
                 grad = binned_data['bin_grad']
-                ax2.plot(r/r200c, grad, '-x', c=colors[i], lw=data_lw, ms=data_ms)
+                ax2.plot(r/r200c[i], grad, '-x', c=colors[i], lw=data_lw, ms=data_ms)
             else:
                 delsig_true = true_profile.delta_sigma(r, bootstrap=False)
-                ax2.errorbar(r/r200c, delsig/delsig_true, 
-                            xerr=bin_widths/2/r200c, yerr=delsig_std/delsig_true, fmt='none', capsize=2, 
+                ax2.errorbar(r/r200c[i], delsig/delsig_true, 
+                            xerr=bin_widths/2/r200c[i], yerr=delsig_std/delsig_true, fmt='none', capsize=2, 
                             ecolor=colors[i], elinewidth=data_lw, capthick=data_lw)
-                ax2.plot(r/r200c, delsig/delsig_true, '-o', c=colors[i], lw=data_lw, ms=data_ms)
+                ax2.plot(r/r200c[i], delsig/delsig_true, '-o', c=colors[i], lw=data_lw, ms=data_ms)
                 ax2_xlim = ax2.get_xlim()
                 ax2_ylim = ax2.get_ylim()
                 ax2.plot(ax2_xlim, [1,1], '--k', lw=1)
@@ -895,8 +896,11 @@ class nfw_profile_fitter:
                 ax2.set_ylim(ax2_ylim)
         
         # plot true profile if not plotted per vary_val in loop above
-        if(len(np.unique(r200c)) != 1 and len(np.unique(c)) != 1):
-            
+        if(len(np.unique(r200c)) == 1 and len(np.unique(c)) == 1):
+            dSigma_true = true_profileis[0].delta_sigma(r, bootstrap=False)
+            ax.loglog(r/r200c[0], dSigma_true, '--', 
+                      label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+                                                          .format(r200c[0], c[0]), color='k', lw=2) 
         else:
             # dummy for legend
             ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$')
@@ -962,7 +966,7 @@ if(__name__ == "__main__"):
     #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
     #                             rbins=30, plot_gradient=True)
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_new/vary_zl')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
     fitter.plot_mass_convergence(vary_var='zl')
     fitter.plot_profile_convergence(vary_var='zl')
@@ -972,7 +976,7 @@ if(__name__ == "__main__"):
     sys.exit()
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
     fitter.plot_mass_convergence(vary_var='zl')
     fitter.plot_profile_convergence(vary_var='zl')
@@ -982,7 +986,7 @@ if(__name__ == "__main__"):
     sys.exit()
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_los')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
     fitter.plot_mass_convergence(vary_var='losClip')
     fitter.plot_profile_convergence(vary_var='losClip')
@@ -990,29 +994,29 @@ if(__name__ == "__main__"):
                                  rbins=30, plot_gradient=False)
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax_zoom')
-    fitter.fit_halos(rmax=[0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5], rmin=[0.2], 
+    fitter.fit_halos(rmax=[0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5], rmin=0.2, 
                      single_halo_plots=False, overwrite=overwrite)
     fitter.plot_mass_convergence(vary_var='rmax', sfx='zoom')
     fitter.plot_profile_convergence(vary_var='rmax', sfx='zoom')
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax')
     fitter.fit_halos(rmax=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5], 
-                     rmin=[0.2], single_halo_plots=False, overwrite=overwrite)
+                     rmin=0.2, single_halo_plots=False, overwrite=overwrite)
     fitter.plot_mass_convergence(vary_var='rmax')
     fitter.plot_profile_convergence(vary_var='rmax')
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax')
-    fitter.fit_halos(rmax=[3.0], rmin=[0.2], single_halo_plots=True, overwrite=True)
+    fitter.fit_halos(rmax=[3.0], rmin=0.2, single_halo_plots=True, overwrite=True)
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_N')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=False, overwrite=overwrite)
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=False, overwrite=overwrite)
     fitter.plot_mass_convergence(vary_var='N')
     fitter.plot_profile_convergence(vary_var='N')
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=False, overwrite=overwrite)
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=False, overwrite=overwrite)
     fitter.plot_mass_convergence(vary_var='zl')
     fitter.plot_profile_convergence(vary_var='zl')
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zs')
-    fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=False, overwrite=overwrite)
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=False, overwrite=overwrite)
     fitter.plot_mass_convergence(vary_var='zs')
     fitter.plot_profile_convergence(vary_var='zs')
