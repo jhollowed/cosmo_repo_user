@@ -227,8 +227,7 @@ class nfw_profile_fitter:
         zl = props['halo_redshift']
         r200c = props['sod_halo_radius']
         c = props['sod_halo_cdelta']
-        #c_err = props['sod_halo_cdelta_error']
-        c_err = 0
+        c_err = props['sod_halo_cdelta_error']
         m200c = props['sod_halo_mass']
         true_profile = NFW(r200c, c, zl, c_err = c_err, cosmo=cosmo)
  
@@ -646,12 +645,18 @@ class nfw_profile_fitter:
         
         print('\n--------------- reading fits and plotting profile convergence ---------------')
        
-        # get true profile
-        truth_out = glob.glob('{}/true*.obj'.format(self.out_dir))[0]
-        true_profile = pickle.load(open(truth_out, 'rb'))
-        r200c = true_profile.r200c
-        c = true_profile.c
-        zl = true_profile.zl
+        # get true halo profile
+        truth_out = glob.glob('{}/true*.obj'.format(self.out_dir))
+        true_profiles = np.array([pickle.load(open(f, 'rb')) for f in truth_out])
+        vary_val = np.array([float(f.split('/')[-1].split(vary_var)[-1].split('_')[0].strip('.obj')) 
+                               for f in truth_out])
+        sorter = np.argsort(vary_val)
+        true_profiles = true_profiles[sorter]
+        
+        true_profile = true_profiles[i]
+        r200c = [t.r200c for t in true_profiles]
+        c = [t.c for t in true_profiles]
+        zl = [t.zl for t in true_profiles]
 
         # get profiles from fit results -- no bootstrap errors here
         fit_out = glob.glob('{}/fitted_profile*.obj'.format(self.out_dir))
@@ -686,21 +691,29 @@ class nfw_profile_fitter:
         
         for i in range(len(dSigma_fitted)):
             ax.loglog(rsamp_full/all_r200c[i], dSigma_fitted[i], color=colors[i], lw=2)
+            # dummy plot for legend
+            ax.plot([-100, -101], [-100, -101], color='k', label=r'$\Delta\Sigma_\mathrm{{fits}}$')
         
-        # plot true profile
-        ax.set_xlim([0.2, 6])
-        ax.set_ylim([2, 300])
-        rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000) * r200c
-        dSigma_true = true_profile.delta_sigma(rsamp, bootstrap=False)
-        ax.loglog(rsamp/r200c, dSigma_true, '--', 
-                  label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
-                                                      .format(r200c, c), color='k', lw=2) 
+        # plot true profile (single black plot if halo params are constant across inputs, colored by vary_val if not)
+        if(len(np.unique(r200c)) == 1 and len(np.unique(c)) == 1):
+            rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000) * r200c
+            dSigma_true = true_profiles[0].delta_sigma(rsamp, bootstrap=False)
+            ax.loglog(rsamp/r200c[0], dSigma_true, '--', 
+                      label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+                                                          .format(r200c[0], c[0]), color='k', lw=2)
+        else:
+            for i in range(len(true_profiles)):
+                dSigma_true = true_profiles[i].delta_sigma(rsamp, bootstrap=False)
+                ax.loglog(rsamp/r200c[i], dSigma_true, '--', color=colors[i]) 
+                # dummy for legend
+                ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$') 
 
         # format
         ax.legend(fontsize=12, loc='best')
         ax.set_xlabel(r'$r/R_{200c}$', fontsize=14)
         ax.set_ylabel(r'$\Delta\Sigma\>\>\lbrack\mathrm{M}_\odot\mathrm{pc}^{-2}\rbrack$', fontsize=14)
-        ax.set_title(r'$z_\mathrm{{lens}} = {}$'.format(zl), fontsize=14)
+        ax.set_xlim([0.2, 6])
+        ax.set_ylim([2, 300])
 
         # plot convergence in the radius-concentration plane
         ax2 = f.add_subplot(122)
@@ -711,17 +724,18 @@ class nfw_profile_fitter:
             ax2.errorbar(all_r200c[i], all_c[i], xerr=all_r200c_err[i], yerr=all_c_err[i], 
                          ms=10, marker='.', c=colors[i])
 
-        # include c-M relation curve
-        grid_r = np.linspace(0.6, 1.2, 100)
-        grid_c = np.linspace(3, 6, 100)
-        tmp_profile = NFW(1,1,zl)
-        tmp_m200c = np.zeros(len(grid_r))
-        for i in range(len(tmp_m200c)):
-            tmp_profile.r200c = grid_r[i]
-            tmp_m200c[i] = tmp_profile.radius_to_mass()
-        tmp_c, tmp_dc = cm(tmp_m200c, zl, cosmo)
-        ax2.plot(grid_r, tmp_c, '--k', lw=2, label=r'$c\mathrm{-}M\mathrm{\>relation\>(Child+2018)}$')
-        ax2.fill_between(grid_r, tmp_c - tmp_dc, tmp_c + tmp_dc, color='k', alpha=0.1, lw=0)
+        # include c-M relation curve (if redshift of lens is fixed)
+        if(len(np.unique(zl)) == 0):
+            grid_r = np.linspace(0.6, 1.2, 100)
+            grid_c = np.linspace(3, 6, 100)
+            tmp_profile = NFW(1,1,zl[0])
+            tmp_m200c = np.zeros(len(grid_r))
+            for i in range(len(tmp_m200c)):
+                tmp_profile.r200c = grid_r[i]
+                tmp_m200c[i] = tmp_profile.radius_to_mass()
+            tmp_c, tmp_dc = cm(tmp_m200c, zl, cosmo)
+            ax2.plot(grid_r, tmp_c, '--k', lw=2, label=r'$c\mathrm{-}M\mathrm{\>relation\>(Child+2018)}$')
+            ax2.fill_between(grid_r, tmp_c - tmp_dc, tmp_c + tmp_dc, color='k', alpha=0.1, lw=0)
 
         # format
         ax2.set_xlim([min(grid_r), max(grid_r)])
@@ -791,6 +805,9 @@ class nfw_profile_fitter:
                                for f in truth_out])
         sorter = np.argsort(vary_val)
         true_profiles = true_profiles[sorter]
+        r200c = [t.r200c for t in true_profiles]
+        c = [t.c for t in true_profiles]
+        zl = [t.zl for t in true_profiles]
 
         # find and sort lenses by increasing vary_val
         sources_out = glob.glob('{}/source_data*.obj'.format(self.out_dir))
@@ -815,9 +832,6 @@ class nfw_profile_fitter:
             
             # ----- read -----
             true_profile = true_profiles[i]
-            r200c = true_profile.r200c
-            c = true_profile.c
-            zl = true_profile.zl
             
             lens = lenses[i]
             lens.set_radial_cuts(rmin, rmax)
@@ -850,9 +864,19 @@ class nfw_profile_fitter:
             else:
                 ax.plot(r/r200c, delsig, 'x', c=colors[i], alpha=0.33, ms=data_ms)
             
-            # plot true profile
-            dSigma_true = true_profile.delta_sigma(r, bootstrap=False)
-            ax.plot(r/r200c, dSigma_true, '--', color=colors[i])
+            # plot true profile for this vary_val if profile parameters are not unique across inputs
+            # (else plot single line below)
+            if(len(np.unique(r200c)) == 1 and len(np.unique(c)) == 1):
+                dSigma_true = true_profileis[0].delta_sigma(r, bootstrap=False)
+                ax.loglog(r/r200c[0], dSigma_true, '--', 
+                          label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
+                                                              .format(r200c[0], c[0]), color='k', lw=2) 
+            else:
+                for i in range(len(true_profiles)):
+                    dSigma_true = true_profiles[i].delta_sigma(rsamp, bootstrap=False)
+                    ax.loglog(rsamp/r200c[i], dSigma_true, '--', color=colors[i]) 
+                # dummy for legend
+                ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$') 
  
             # plot bin gradients or biases
             if(plot_gradient):
@@ -869,9 +893,15 @@ class nfw_profile_fitter:
                 ax2.plot(ax2_xlim, [1,1], '--k', lw=1)
                 ax2.set_xlim(ax2_xlim)
                 ax2.set_ylim(ax2_ylim)
+        
+        # plot true profile if not plotted per vary_val in loop above
+        if(len(np.unique(r200c)) != 1 and len(np.unique(c)) != 1):
+            
+        else:
+            # dummy for legend
+            ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$')
          
         # dummy plot to get error bars in legend exaxctly once
-        ax.plot([-100, -101], [-100, -101], '--', color='k', label=r'$\Delta\Sigma_\mathrm{{true}}$')
         ax.errorbar(-100, -100, xerr=1, y_std=1, fmt='none', capsize=2, ecolor='k', elinewidth=data_lw,
                     label=r'$\gamma_{\mathrm{NFW}}\Sigma_c,\>\>y:\mathrm{std},\>x:\mathrm{bin\>width},$')
         ax.errorbar(-100, -100, xerr=10, y_err=10, fmt='none', ecolor='k', elinewidth=6, alpha=0.2, 
