@@ -696,7 +696,7 @@ class nfw_profile_fitter:
         
         # plot true profile (single black plot if halo params are constant across inputs, colored by vary_val if not)
         if(len(np.unique(r200c)) == 1 and len(np.unique(c)) == 1):
-            rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000) * r200c
+            rsamp = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], 1000) * r200c[0]
             dSigma_true = true_profiles[0].delta_sigma(rsamp, bootstrap=False)
             ax.loglog(rsamp/r200c[0], dSigma_true, '--', 
                       label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
@@ -897,7 +897,7 @@ class nfw_profile_fitter:
         
         # plot true profile if not plotted per vary_val in loop above
         if(len(np.unique(r200c)) == 1 and len(np.unique(c)) == 1):
-            dSigma_true = true_profileis[0].delta_sigma(r, bootstrap=False)
+            dSigma_true = true_profiles[0].delta_sigma(r, bootstrap=False)
             ax.loglog(r/r200c[0], dSigma_true, '--', 
                       label=r'$\Delta\Sigma_\mathrm{{NFW}},\>\>r_{{200c}}={:.3f}; c={:.3f}$'\
                                                           .format(r200c[0], c[0]), color='k', lw=2) 
@@ -965,7 +965,7 @@ if(__name__ == "__main__"):
     #fitter.plot_profile_convergence(vary_var='lenspix')
     #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
     #                             rbins=30, plot_gradient=True)
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_new/vary_zl')
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
     fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
     fitter.plot_mass_convergence(vary_var='zl')
