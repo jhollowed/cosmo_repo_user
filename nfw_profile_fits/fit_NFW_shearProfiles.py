@@ -13,7 +13,7 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 from astropy.cosmology import FlatLambdaCDM
 cosmo = FlatLambdaCDM(H0=71, Om0=0.220, Ob0=0.02258*(0.71**2), name='OuterRim')
@@ -26,7 +26,6 @@ from lensing_system import obs_lens_system
 from mass_concentration import child2018 as cm
 from fit_profile import fit_nfw_profile_lstq as fit
 from fit_profile import fit_nfw_profile_gridscan as fit_gs
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
     
 def imscatter(x, y, image, ax=None, zoom=1):
     if ax is None:
@@ -89,7 +88,7 @@ class nfw_profile_fitter:
         self.out_dir = '{}/profile_fits'.format(NFW_dir)
         
         self.var_strs = {'zl':r'$z_l$', 'zs':r'$z_s$', 'N':r'$\mathrm{particle\>count}$', 
-                         'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation$', 
+                         'fov':r'$\mathrm{fov\>size/extent\>of\>particle generation}$', 
                          'rmin':r'$r_{\mathrm{fit,min}}$', 'rmax':r'$r_{\mathrm{fit,max}}$',
                          'losClip':r'$\Delta z_\mathrm{clip}$', 'nsrcs':r'$N\>\mathrm{sources}$',
                          'lenspix':r'$\sqrt{N_\mathrm{lensmap\>pixels}}$'}
@@ -258,12 +257,17 @@ class nfw_profile_fitter:
                 t2 = np.hstack([t2, np.ravel(plane['x2'][:])])
             
             if(dim == 2): 
-                # get grid point angular posiitons
-                nnn = len(plane['shear1'][0]) # fov width in gridpoints
-                bsz_arc = float(props['boxRadius_arcsec']*2) # fov width in arcsec
-                dsx_arc = bsz_arc/nnn
-                x1 = np.linspace(0, bsz_arc-dsx_arc, nnn) - bsz_arc/2.0 + dsx_arc/2.0
-                x2 = np.linspace(0, bsz_arc-dsx_arc, nnn) - bsz_arc/2.0 + dsx_arc/2.0
+                try:
+                    # if output_positions was turned on in lensing run 
+                    x1 = np.hstack([t1, np.ravel(plane['x1'][:])])
+                    x2 = np.hstack([t2, np.ravel(plane['x2'][:])])
+                except:
+                    # get grid point angular posiitons
+                    nnn = len(plane['shear1'][0]) # fov width in gridpoints
+                    bsz_arc = float(props['boxRadius_arcsec']*2) # fov width in arcsec
+                    dsx_arc = bsz_arc/nnn
+                    x1 = np.linspace(0, bsz_arc-dsx_arc, nnn) - bsz_arc/2.0 + dsx_arc/2.0
+                    x2 = np.linspace(0, bsz_arc-dsx_arc, nnn) - bsz_arc/2.0 + dsx_arc/2.0
                 t1, t2 = np.meshgrid(x1, x2)
                 t1 = np.ravel(t1)
                 t2 = np.ravel(t2)
@@ -918,6 +922,7 @@ class nfw_profile_fitter:
                 dimensionless_r = all_r[rs_mask]
                 delsig_rs = lens.calc_delta_sigma()[rs_mask]
                 delsig_rs_err = np.std(delsig_rs)/np.sqrt(len(delsig_rs))
+                pdb.set_trace()
                 ax3.errorbar([zl[i]], [np.mean(delsig_rs) / dsig_exp_rs[i]], 
                               xerr=[0], yerr=[delsig_rs_err / dsig_exp_rs[i]], fmt='.', 
                               capsize=2, color=colors[i], ecolor=colors[i], elinewidth=data_lw, capthick=data_lw)
@@ -968,23 +973,32 @@ if(__name__ == "__main__"):
     # turn to True to force overwrite pre-existing fits
     overwrite = False
     
-    # run all convergence tests
-    #fitter = nfw_profile_fitter(NFW_dir = '/projects/DarkUniverse_esp/jphollowed/profile_fitting_tests/convergence_tests/vary_rmax')
-    #fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_sph')
-    #fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
-    #                 bin_data=True, rbins=30, inputs='grid')
-    #fitter.plot_profile_convergence(vary_var='lenspix')
-    #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
-    #                             rbins=30, plot_gradient=False)
-    #sys.exit()
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_prop/vary_zl')
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+                     bin_data=True, rbins=30, inputs='grid')
+    fitter.plot_mass_convergence(vary_var='zl')
+    fitter.plot_profile_convergence(vary_var='zl')
+    fitter.plot_data_convergence(vary_var='zl', rmin=0.2, rmax=None, bin_data=True, 
+                                 rbins=30, plot_gradient=False, plot_zdepx=False)
     
-    #fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_lenspix')
-    #fitter.fit_halos(rmax=[None], rmin=[0.2], single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
-    #                 bin_data=True, rbins=30, inputs='grid')
-    #fitter.plot_mass_convergence(vary_var='lenspix')
-    #fitter.plot_profile_convergence(vary_var='lenspix')
-    #fitter.plot_data_convergence(vary_var='lenspix', rmin=0.2, rmax=None, bin_data=True, 
-    #                             rbins=30, plot_gradient=True)
+    sys.exit()
+    
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rfrac_0.5')
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+                     bin_data=True, rbins=30, inputs='grid')
+    fitter.plot_mass_convergence(vary_var='fov')
+    fitter.plot_profile_convergence(vary_var='fov')
+    fitter.plot_data_convergence(vary_var='fov', rmin=0.2, rmax=None, bin_data=True, 
+                                 rbins=30, plot_gradient=False, plot_zdepx=False)
+     
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rfrac_0.2')
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+                     bin_data=True, rbins=30, inputs='grid')
+    fitter.plot_mass_convergence(vary_var='fov')
+    fitter.plot_profile_convergence(vary_var='fov')
+    fitter.plot_data_convergence(vary_var='fov', rmin=0.2, rmax=None, bin_data=True, 
+                                 rbins=30, plot_gradient=False)
+    
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
     fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
@@ -993,50 +1007,4 @@ if(__name__ == "__main__"):
     fitter.plot_data_convergence(vary_var='zl', rmin=0.2, rmax=None, bin_data=True, 
                                  rbins=30, plot_gradient=False)
     
-    sys.exit()
     
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
-    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
-                     bin_data=True, rbins=30, inputs='grid')
-    fitter.plot_mass_convergence(vary_var='zl')
-    fitter.plot_profile_convergence(vary_var='zl')
-    fitter.plot_data_convergence(vary_var='zl', rmin=0.2, rmax=None, bin_data=True, 
-                                 rbins=30, plot_gradient=False)
-    
-    sys.exit()
-    
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_los')
-    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
-                     bin_data=True, rbins=30, inputs='grid')
-    fitter.plot_mass_convergence(vary_var='losClip')
-    fitter.plot_profile_convergence(vary_var='losClip')
-    fitter.plot_data_convergence(vary_var='losClip', rmin=0.2, rmax=None, bin_data=True, 
-                                 rbins=30, plot_gradient=False)
-    
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax_zoom')
-    fitter.fit_halos(rmax=[0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5], rmin=0.2, 
-                     single_halo_plots=False, overwrite=overwrite)
-    fitter.plot_mass_convergence(vary_var='rmax', sfx='zoom')
-    fitter.plot_profile_convergence(vary_var='rmax', sfx='zoom')
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax')
-    fitter.fit_halos(rmax=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5], 
-                     rmin=0.2, single_halo_plots=False, overwrite=overwrite)
-    fitter.plot_mass_convergence(vary_var='rmax')
-    fitter.plot_profile_convergence(vary_var='rmax')
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rmax')
-    fitter.fit_halos(rmax=[3.0], rmin=0.2, single_halo_plots=True, overwrite=True)
-    
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_N')
-    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=False, overwrite=overwrite)
-    fitter.plot_mass_convergence(vary_var='N')
-    fitter.plot_profile_convergence(vary_var='N')
-    
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zl')
-    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=False, overwrite=overwrite)
-    fitter.plot_mass_convergence(vary_var='zl')
-    fitter.plot_profile_convergence(vary_var='zl')
-    
-    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_zs')
-    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=False, overwrite=overwrite)
-    fitter.plot_mass_convergence(vary_var='zs')
-    fitter.plot_profile_convergence(vary_var='zs')
