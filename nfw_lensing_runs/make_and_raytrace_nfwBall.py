@@ -16,9 +16,9 @@ import cosmology as cm
 # ======================================================================================================
 
 
-def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6, 
-              nsrcs=10000, lenspix=1024, out_dir='./output', vis=False,
-              density_estimator='dtfe', seed=606, cosmo=cm.OuterRim_params):
+def make_halo(zl=0.3, zs=1.0, N=10000, rmax=6, depth=6, nsrcs=10000, 
+              lenspix=1024, out_dir='./output', vis=False, density_estimator='dtfe', 
+              seed=606, skip_raytrace=False, cosmo = cm.OuterRim_params):
     '''
     Generate an NFW particle distribution and place it at a redshift z via the methods in mpwl_raytrace
 
@@ -30,11 +30,11 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6,
         redshift of sources; defaults to 1.0
     N : int, optional
         number of particles to draw; defaults to 10000
-    rfrac : float, optional
+    rmax : float, optional
         physical extent of generated particle set in units of r200c; defaults to 6
-    rfrac_los : float, optional
+    depth : float, optional
         physical extent of generated particle set in units of r200c in the line-of-sight dimension. 
-        Defaults to None, in which case it is set to match rfrac
+        Defaults to None, in which case it is set to match rmax
     nsrcs : int
         Number of sources to place on the source plane. Defaults to 10000
     lenspix : int
@@ -43,7 +43,7 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6,
     out_dir : str, optinal
         location for output, does not have to exist; defaults to "./output/" where "." is the current
         working directory. Within this location, a directory will be created as 
-        "halo_z{:.2f}_N{}_{:.2f}r200c".format(z, N, rfrac)
+        "halo_z{:.2f}_N{}_{:.2f}r200c".format(z, N, rmax)
     vis : bool, optional
         flag to send to make_simple_halo to generate a figure of the NFW particles or not
     density_estimator : string, optional
@@ -52,10 +52,15 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6,
             Random seed to pass to HaloTools for generation of radial particle positions, and
             use for drawing concentrations and angular positions of particles. None for stocahstic
             results
+    skip_raytrace : bool, optional
+        Whether or not to skip the raytracing, outputting only the generated particle set. 
+        Defaults to False.
+    cosmo : astropy cosmology object, optional
+        The cosmology object to use in the particle generation and lensing. Defaults to Outer Rim
     '''
 
-    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos_nsrcs{}_lenspix{}".format(
-                             out_dir, zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix))
+    out_dir=os.path.abspath("{}/halo_zl{:.2f}_zs{:.2f}_N{}_{:.2f}r200c_{:.2f}r200clos_nsrcs{}_lenspix{}_seed{}".format(
+                             out_dir, zl, zs, N, rmax, depth, nsrcs, lenspix, seed))
 
     print('\n\n=============== working on halo at {} ==============='.format(out_dir.split('/')[-1]))
     print('Populating halo with particles')
@@ -68,13 +73,15 @@ def make_halo(zl=0.3, zs=1.0, N=10000, rfrac=6, rfrac_los=6,
     r200c = (3*m200c/(4*np.pi*rho*200))**(1/3)
 
     halo = NFW(r200c=r200c, c=c, z=zl, seed=seed)
-    halo.populate_halo(N=N, rfrac=rfrac, rfrac_los=rfrac_los)
+    halo.populate_halo(N=N, rfrac=rmax)
+    #halo.populate_halo_fov(N=N, rfrac=rmax, depth=depth)
     
     print('writing out')
-    halo.output_particles(output_dir = out_dir, vis_debug=vis)
+    halo.output_particles(output_dir=out_dir, vis_debug=vis)
     
     print('starting raytrace')
-    raytrace_lens(out_dir, zs=[zs], vis=vis, nsrcs=nsrcs, lenspix=lenspix, density_estimator=density_estimator)
+    if(not skip_raytrace):
+        raytrace_lens(out_dir, zs=[zs], vis=vis, nsrcs=nsrcs, lenspix=lenspix, density_estimator=density_estimator)
 
 
 # ======================================================================================================
@@ -124,19 +131,21 @@ def raytrace_lens(halo_dir, nsrcs, lenspix, lensing_dir=None, zs=[1.0], seed=606
 if __name__ == '__main__':
 
     # default params
-    zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix, out_dir, vis, de = \
-        0.2, 1.0, 20000, 6, 6, 10000, 1024, './output', True, 'dtfe'
+    zl, zs, N, rmax, depth, nsrcs, lenspix, out_dir, vis, de, seed, skip_raytrace = \
+        0.2, 1.0, 20000, 6, 6, 10000, 1024, './output', True, 'dtfe', 606, False
 
     # override default by argv
     if(len(sys.argv) > 1): zl = float(sys.argv[1])
     if(len(sys.argv) > 2): zs = float(sys.argv[2])
     if(len(sys.argv) > 3): N = int(sys.argv[3])
-    if(len(sys.argv) > 4): rfrac = float(sys.argv[4])
-    if(len(sys.argv) > 5): rfrac_los = float(sys.argv[5])
+    if(len(sys.argv) > 4): rmax = float(sys.argv[4])
+    if(len(sys.argv) > 5): depth = float(sys.argv[5])
     if(len(sys.argv) > 6): nsrcs = int(sys.argv[6])
     if(len(sys.argv) > 7): lenspix = int(sys.argv[7])
     if(len(sys.argv) > 8): out_dir = sys.argv[8]
     if(len(sys.argv) > 9): vis = bool(int(sys.argv[9]))
     if(len(sys.argv) > 10): de = sys.argv[10]
+    if(len(sys.argv) > 11): seed = int(sys.argv[11])
+    if(len(sys.argv) > 12): skip_raytrace = bool(sys.argv[12])
 
-    make_halo(zl, zs, N, rfrac, rfrac_los, nsrcs, lenspix, out_dir, vis, de)
+    make_halo(zl, zs, N, rmax, depth, nsrcs, lenspix, out_dir, vis, de, seed, skip_raytrace)

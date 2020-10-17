@@ -973,6 +973,15 @@ if(__name__ == "__main__"):
     # turn to True to force overwrite pre-existing fits
     overwrite = False
     
+    fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_newtest')
+    fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
+                     bin_data=True, rbins=30, inputs='grid')
+    fitter.plot_mass_convergence(vary_var='zl')
+    fitter.plot_profile_convergence(vary_var='zl')
+    fitter.plot_data_convergence(vary_var='zl', rmin=0.2, rmax=None, bin_data=True, 
+                                 rbins=30, plot_gradient=False, plot_zdepx=False)
+    sys.exit()
+    
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output_prop/vary_zl')
     fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
                      bin_data=True, rbins=30, inputs='grid')
@@ -981,7 +990,6 @@ if(__name__ == "__main__"):
     fitter.plot_data_convergence(vary_var='zl', rmin=0.2, rmax=None, bin_data=True, 
                                  rbins=30, plot_gradient=False, plot_zdepx=False)
     
-    sys.exit()
     
     fitter = nfw_profile_fitter(NFW_dir = '/Users/joe/repos/repo_user/nfw_lensing_runs/output/vary_rfrac_0.5')
     fitter.fit_halos(rmax=[None], rmin=0.2, single_halo_plots=True, grid_scan=False, overwrite=overwrite, 
