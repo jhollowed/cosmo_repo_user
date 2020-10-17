@@ -71,6 +71,35 @@ class profile_checker():
         
         self.lens = obs_lens_system(self.zl, cosmo=cosmo)
         self.lens.set_background(self.tp_los, self.pp_los, self.zp_los, yt=np.zeros(len(self.zp_los)))
+    
+    
+    def read_density_estimate(self):
+        
+        self.xxp_los = np.array([])
+        self.yyp_los = np.array([])
+        self.zzp_los = np.array([])
+        self.zp_los = np.array([])
+        self.tp_los = np.array([])
+        self.pp_los = np.array([])
+        self.pdir = self.inp.input_prtcls_dir
+        
+        columns = ['redshift', 'x', 'y', 'z', 'theta', 'phi']
+        arrs = [self.zp_los, self.xxp_los, self.yyp_los, self.zzp_los, self.tp_los, self.pp_los]
+
+        for i in range(len(arrs)):
+                arrs[i] = np.fromfile('{0}/{1}.bin'.format(self.pdir, columns[i]), dtype = "f")
+        self.zp_los, self.xxp_los, self.yyp_los, self.zzp_los, self.tp_los, self.pp_los = arrs
+       
+        self.xxp_los = (self.xxp_los - np.mean(self.xxp_los)) * self.a
+        self.yyp_los = (self.yyp_los - np.mean(self.yyp_los)) * self.a
+        self.zzp_los = (self.zzp_los - np.mean(self.zzp_los)) * self.a
+        self.rrp_los = np.linalg.norm([self.xxp_los, self.yyp_los, self.zzp_los], axis=0)
+
+        self.tp_los = self.tp_los - np.mean(self.tp_los)
+        self.pp_los = self.pp_los - np.mean(self.pp_los)
+        
+        self.lens = obs_lens_system(self.zl, cosmo=cosmo)
+        self.lens.set_background(self.tp_los, self.pp_los, self.zp_los, yt=np.zeros(len(self.zp_los)))
 
 
     def view_particles(self):

@@ -146,6 +146,6 @@ if __name__ == '__main__':
     if(len(sys.argv) > 9): vis = bool(int(sys.argv[9]))
     if(len(sys.argv) > 10): de = sys.argv[10]
     if(len(sys.argv) > 11): seed = int(sys.argv[11])
-    if(len(sys.argv) > 12): skip_raytrace = bool(sys.argv[12])
+    if(len(sys.argv) > 12): skip_raytrace = bool(int(sys.argv[12]))
 
     make_halo(zl, zs, N, rmax, depth, nsrcs, lenspix, out_dir, vis, de, seed, skip_raytrace)
